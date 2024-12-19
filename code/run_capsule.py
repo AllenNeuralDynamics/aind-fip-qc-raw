@@ -9,18 +9,21 @@ import matplotlib.gridspec as gridspec
 import numpy as np
 import os
 from datetime import datetime, timezone
-from aind_data_schema_models.modalities import Modality
-from aind_data_schema.core.quality_control import QCEvaluation, QualityControl, QCMetric, Stage, Status, QCStatus
 import boto3
 import requests
+import kachery_cloud as kcl
 from aws_requests_auth.aws_auth import AWSRequestsAuth
 import argparse 
 from pathlib import Path
-import logging
+#import logging
 from aind_log_utils.log import setup_logging
+from aind_data_access_api.document_db import MetadataDbClient
+from aind_data_schema_models.modalities import Modality
+from aind_data_schema.core.quality_control import QCEvaluation, QualityControl, QCMetric, Stage, Status, QCStatus
+
 
 if __name__ == "__main__": 
-    parser = argparse.ArgumentParser(description="Raw fiber QC")
+    parser = argparse.ArgumentParser(description="aind-fip-qc-raw")
 
     data_folder = Path("../data")
     results_folder = Path("../results")
@@ -51,7 +54,7 @@ if __name__ == "__main__":
         print('mouse_id: ' + mouse_id)
         print('fibfolder: ' + fibfolder)
 
-        setup_logging("aind-fiber-raw-qc", mouse_id=mouse_id, session_name = sessionname)
+        #setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = sessionname)
         t = datetime.now(timezone.utc)
 
 
@@ -162,7 +165,6 @@ if __name__ == "__main__":
         plt.savefig('/root/capsule/results/SyncPulseDiff.png')
 
         #%%
-        import kachery_cloud as kcl
 
         def get_kachery_secrets():
             """Obtains the three kachery-cloud environment keys/secrets"""
@@ -357,7 +359,6 @@ if __name__ == "__main__":
 
 
         #%% DocDB
-        from aind_data_access_api.document_db import MetadataDbClient
 
         def query_docdb_id(asset_name: str):
             """
