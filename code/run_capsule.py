@@ -28,7 +28,7 @@ if __name__ == "__main__":
     data_folder = Path("../data")
     results_folder = Path("../results")
 
-    parser.add_argument("--asset-name", type=str, default = 'behavior_746346_2024-12-12_12-41-44')
+    parser.add_argument("--asset-name", type=str, default = 'behavior_749624_2024-12-16_09-41-19')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -49,10 +49,10 @@ if __name__ == "__main__":
         mouse_id = sessionname.split('_')[0]
         fibfolder = sessionfolder + '/fib'
 
-        print('sessionfolder: ' + sessionfolder)
-        print('sessionfoldername: ' + sessionfoldername)
-        print('mouse_id: ' + mouse_id)
-        print('fibfolder: ' + fibfolder)
+        #print('sessionfolder: ' + sessionfolder)
+        #print('sessionfoldername: ' + sessionfoldername)
+        #print('mouse_id: ' + mouse_id)
+        #print('fibfolder: ' + fibfolder)
 
         #setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = sessionname)
         t = datetime.now(timezone.utc)
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             file2 = glob.glob(fibfolder + os.sep + "FIP_DataIso_*")[0]
             file3 = glob.glob(fibfolder + os.sep + "FIP_DataR_*")[0]
         except:
-            logging.info("FIP Data don't exist, skipping the QC capsule")
+            #logging.info("FIP Data don't exist, skipping the QC capsule")
             sys.exit(1)
 
         with open(file1) as f:
@@ -86,13 +86,14 @@ if __name__ == "__main__":
             #del datatemp
 
         #%% read behavior json file
-        behavior_json_path = sessionfolder + '/behavior/behavior_' + sessionname + '.json'
+        behavior_json_path = glob.glob(sessionfolder + '/behavior/*' + sessionname + '.json')[0]
+
 
         try:
             with open(behavior_json_path, 'r', encoding='utf-8') as f:
                 behavior_json = json.load(f)
         except:
-            logging.info("behavior json file don't exist, skipping the QC capsule")
+            #logging.info("behavior json file don't exist, skipping the QC capsule")
             sys.exit(1)        
 
         RisingTime=behavior_json['B_PhotometryRisingTimeHarp']
@@ -214,41 +215,41 @@ if __name__ == "__main__":
             Metrics["IsDataSizeSame"] = True
         else:
             Metrics["IsDataSizeSame"] = False
-            logging.info("DataSizes are not the same")
+            #logging.info("DataSizes are not the same")
 
         if len(data1) > 18000:
             Metrics["IsDataLongerThan15min"] = True
         else:
             Metrics["IsDataLongerThan15min"] = False
-            logging.info("The session is shorter than 15min")
+            #logging.info("The session is shorter than 15min")
 
         if len(RisingTime) == len(FallingTime):
             Metrics["IsSyncPulseSame"] = True
         else:
             Metrics["IsSyncPulseSame"] = False
-            logging.info("# of Rising and Falling sync pulses are not the same")
+            #logging.info("# of Rising and Falling sync pulses are not the same")
 
         if len(RisingTime) == len(data1) or len(RisingTime) == len(data2) or len(RisingTime) == len(data3):
             Metrics["IsSyncPulseSameAsData"] = True
         else:
             Metrics["IsSyncPulseSameAsData"] = False
-            logging.info("# of sync pulses are not the same as Data")
+            #logging.info("# of sync pulses are not the same as Data")
 
         if np.isnan(data1).any():
             Metrics["NoGreenNan"] = False
-            logging.info("Green Ch has NaN")
+            #logging.info("Green Ch has NaN")
         else:
             Metrics["NoGreenNan"] = True
 
         if np.isnan(data2).any():
             Metrics["NoIsoNan"] = False
-            logging.info("Green Ch has NaN")
+            #logging.info("Green Ch has NaN")
         else:
             Metrics["NoIsoNan"] = True
 
         if np.isnan(data1).any():
             Metrics["NoRedNan"] = False
-            logging.info("Red Ch has NaN")
+            #logging.info("Red Ch has NaN")
         else:
             Metrics["NoRedNan"] = True
 
@@ -257,26 +258,26 @@ if __name__ == "__main__":
             Metrics["CMOSFloorDark_Green"] = True
         else:
             Metrics["CMOSFloorDark_Green"] = False
-            logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
+            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
 
         if IsoChFloorAve < 265:
             Metrics["CMOSFloorDark_Iso"] = True
         else:
             Metrics["CMOSFloorDark_Iso"] = False
-            logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
+            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
 
         if RedChFloorAve < 265:
             Metrics["CMOSFloorDark_Red"] = True
         else:
             Metrics["CMOSFloorDark_Red"] = False
-            logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
+            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
 
 
         if np.max(np.diff(data1[10:-2,1])) < 5000 and np.max(np.diff(data2[10:-2,1])) < 5000 and np.max(np.diff(data3[10:-2,1])) < 5000:
             Metrics["NoSuddenChangeInSignal"] = True
         else:
             Metrics["NoSuddenChangeInSignal"] = False
-            logging.info("Sudden change in signal; potential movement in fiber coupling and etc")
+            #logging.info("Sudden change in signal; potential movement in fiber coupling and etc")
 
 
         #%% AIND QC schema embeding
