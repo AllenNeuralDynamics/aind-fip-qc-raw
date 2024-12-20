@@ -28,7 +28,7 @@ if __name__ == "__main__":
     data_folder = Path("../data")
     results_folder = Path("../results")
 
-    parser.add_argument("--asset-name", type=str, default = 'behavior_749624_2024-12-16_09-41-19')
+    parser.add_argument("--asset-name", type=str, default = 'behavior_754430_2024-12-19_13-05-45')
 
     # Parse the command-line arguments
     args = parser.parse_args()
