@@ -167,37 +167,7 @@ if __name__ == "__main__":
 
         #%%
 
-        def get_kachery_secrets():
-            """Obtains the three kachery-cloud environment keys/secrets"""
-            secret_name = "/aind/prod/kachery/credentials"
-            region_name = "us-west-2"
-
-            # Create a Secrets Manager client
-            session = boto3.session.Session()
-            client = session.client(
-                service_name='secretsmanager',
-                region_name=region_name
-            )
-
-            try:
-                get_secret_value_response = client.get_secret_value(
-                    SecretId=secret_name
-                )
-            except ClientError as e:
-                # For a list of exceptions thrown, see
-                # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-                raise e
-
-            secret = get_secret_value_response['SecretString']
-            
-            kachery_secrets = json.loads(secret)
-
-            os.environ['KACHERY_ZONE'] = kachery_secrets['KACHERY_ZONE']
-            os.environ['KACHERY_CLOUD_CLIENT_ID'] = kachery_secrets['KACHERY_CLOUD_CLIENT_ID']
-            os.environ['KACHERY_CLOUD_PRIVATE_KEY'] = kachery_secrets['KACHERY_CLOUD_PRIVATE_KEY']
-
-        get_kachery_secrets()
-
+        '''
         # %%
         file_path0 = "/root/capsule/results/raw_traces.png"
         uri0 = kcl.store_file(file_path0, label=file_path0)
@@ -207,7 +177,7 @@ if __name__ == "__main__":
 
         file_path2 = "/root/capsule/results/SyncPulseDiff.png"
         uri2 = kcl.store_file(file_path2, label=file_path2)
-
+        '''
         #%%
         Metrics = dict()
 
@@ -299,8 +269,8 @@ if __name__ == "__main__":
             modality=Modality.FIB,
             stage=Stage.RAW,
             metrics=[
-                QCMetric(name="Data length same", value=len(data1), status_history=[Bool2Status(Metrics["IsDataSizeSame"])], reference=uri0),
-                QCMetric(name="Session length >15min", value=len(data1)/20/60, status_history=[Bool2Status(Metrics["IsDataLongerThan15min"])], reference=uri0)
+                QCMetric(name="Data length same", value=len(data1), status_history=[Bool2Status(Metrics["IsDataSizeSame"])], reference=r'/root/capsule/results/raw_traces.png'),
+                QCMetric(name="Session length >15min", value=len(data1)/20/60, status_history=[Bool2Status(Metrics["IsDataLongerThan15min"])], reference=r'/root/capsule/results/raw_traces.png')
             ],
             description="Pass when GreenCh_data_length==IsoCh_data_length and GreenCh_data_length==RedCh_data_length, and the session is >15min",
         )
@@ -310,8 +280,8 @@ if __name__ == "__main__":
             modality=Modality.FIB,
             stage=Stage.RAW,
             metrics=[
-                QCMetric(name="Data length same", value=len(RisingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSame"])],reference=uri2),
-                QCMetric(name="Data length same", value=len(FallingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSameAsData"])],reference=uri2) 
+                QCMetric(name="Data length same", value=len(RisingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSame"])],reference="/root/capsule/results/SyncPulseDiff.png"),
+                QCMetric(name="Data length same", value=len(FallingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSameAsData"])],reference="/root/capsule/results/SyncPulseDiff.png") 
             ],
             allow_failed_metrics=True, # most incoplete sync pulses can be fixed/recovered during preprocessing (alignment module)
             description="Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
@@ -335,9 +305,9 @@ if __name__ == "__main__":
             modality=Modality.FIB,
             stage=Stage.RAW,
             metrics=[
-                QCMetric(name="Floor average signal in Green channel", value=float(GreenChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Green"])],reference=uri1),
-                QCMetric(name="Floor average signal in Iso channel", value=float(IsoChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Iso"])],reference=uri1),
-                QCMetric(name="Floor average signal in Red channel", value=float(RedChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Red"])],reference=uri1)
+                QCMetric(name="Floor average signal in Green channel", value=float(GreenChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Green"])],reference="/root/capsule/results/CMOS_Floor.png"),
+                QCMetric(name="Floor average signal in Iso channel", value=float(IsoChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Iso"])],reference="/root/capsule/results/CMOS_Floor.png"),
+                QCMetric(name="Floor average signal in Red channel", value=float(RedChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Red"])],reference="/root/capsule/results/CMOS_Floor.png")
             ],
             allow_failed_metrics=False,
             description="Pass when CMOS dark floor is <265 in all channel"
@@ -348,7 +318,7 @@ if __name__ == "__main__":
             modality=Modality.FIB,
             stage=Stage.RAW,
             metrics=[
-                QCMetric(name="1st derivative of Green channel", value=float(np.max(np.diff(data1[10:-2,1]))), status_history=[Bool2Status(Metrics["NoSuddenChangeInSignal"])],reference=uri0)
+                QCMetric(name="1st derivative of Green channel", value=float(np.max(np.diff(data1[10:-2,1]))), status_history=[Bool2Status(Metrics["NoSuddenChangeInSignal"])],reference="/root/capsule/results/raw_traces.png")
             ],
             allow_failed_metrics=True,
             description="Pass when 1st derivatives of signals are < 5000"
@@ -389,29 +359,3 @@ if __name__ == "__main__":
             return docdb_id
 
         docdb_id = query_docdb_id(os.path.basename(sessionfoldername))
-
-        #%% push to DocDB
-        session = boto3.Session()
-        credentials = session.get_credentials()
-        host = "api.allenneuraldynamics.org"
-
-        auth = AWSRequestsAuth(
-        aws_access_key=credentials.access_key,
-        aws_secret_access_key=credentials.secret_key,
-        aws_token=credentials.token,
-        aws_host="api.allenneuraldynamics.org",
-        aws_region='us-west-2',
-        aws_service='execute-api'
-        )
-        url = f"https://{host}/v1/add_qc_evaluation"
-
-        for eval_ii in qceval_list:
-            post_request_content = {"data_asset_id": docdb_id,
-                                    "qc_evaluation": eval_ii.model_dump(mode='json')}
-
-            response = requests.post(url=url, auth=auth, 
-                                    json=post_request_content)
-
-            if response.status_code != 200:
-                print(response.status_code)
-                print(response.text)
