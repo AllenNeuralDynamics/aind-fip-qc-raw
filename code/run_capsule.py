@@ -41,21 +41,38 @@ if __name__ == "__main__":
         asset_name = None
         
     if asset_name is not None:
+        fiber_json_path = Path("/data/fiber_raw_data")
+        # Load subject data
+        subject_json_path = fiber_json_path / "subject.json"
+        with open(subject_json_path, "r") as f:
+            subject_data = json.load(f)
 
-        sessionfolder = str(data_folder / asset_name)
+        # Grab the subject_id and times for logging
+        subject_id = subject_data.get("subject_id", None)
 
-        sessionname = sessionfolder.split('behavior_')[1]
-        sessionfoldername = os.path.basename(sessionfolder)
-        mouse_id = sessionname.split('_')[0]
-        fibfolder = sessionfolder + '/fib'
+        # Raise an error if subject_id is None
+        if subject_id is None:
+            logging.info("NO SUBJECT ID IN SUBJECT FILE")
+            raise ValueError("subject_id is missing from the subject_data.")
 
-        #print('sessionfolder: ' + sessionfolder)
-        #print('sessionfoldername: ' + sessionfoldername)
-        #print('mouse_id: ' + mouse_id)
-        #print('fibfolder: ' + fibfolder)
+        # Load data description
+        data_description_path = fiber_json_path / "data_description.json"
+        with open(data_description_path, "r") as f:
+            date_data = json.load(f)
 
-        #setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = sessionname)
-        t = datetime.now(timezone.utc)
+        # Attempt to extract the creation time
+        date = date_data.get("creation_time", None)
+
+        # Fallback to session start time if date is missing
+        if date is None:
+            session_path = fiber_json_path / "session.json"
+            with open(session_path, "r") as f:
+                session_data = json.load(f)
+            date = session_data.get("session_start_time", None)
+        asset_name = "behavior_" + subject_id + "_" + date
+
+        setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = asset_name)
+
 
 
         #need to skip the entire QC if FIP files don't exist
