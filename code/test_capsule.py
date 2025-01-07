@@ -106,17 +106,27 @@ def create_evaluation(
     )
 
 
-def plot_data(data_list, colors, titles, save_path):
+def plot_cmos_trace_data(data_list, colors, results_folder):
     """Plot raw frame and cmos data and save to a file."""
+    data1 = data_list[0]
+    data2 = data_list[1]
     plt.figure(figsize=(8, 4))
-    for i, (data, color, title) in enumerate(zip(data_list, colors, titles)):
-        plt.subplot(2, len(data_list), i + 1)
-        plt.plot(data, color=color)
-        plt.title(title)
-        plt.xlabel("frames")
-        plt.ylabel("CMOS pixel val")
+    for i_panel in range(4):
+        plt.subplot(2,4,i_panel+1)
+        plt.plot(data1[:,i_panel+1],color=colors[0])
+        plt.title('GreenCh ROI:' + str(i_panel))
+        plt.xlabel('frames')
+        plt.ylabel('CMOS pixel val')
+
+    for i_panel in range(4):
+        plt.subplot(2,4,i_panel+5)
+        plt.plot(data2[:,i_panel+1],color=colors[1])
+        plt.title('RedCh ROI:' + str(i_panel))
+        plt.xlabel('frames')
+        plt.ylabel('CMOS pixel val')
     plt.subplots_adjust(wspace=0.8, hspace=0.8)
-    plt.savefig(save_path)
+    plt.savefig(f"{results_folder}/raw_traces.png")    
+    plt.savefig(f"{results_folder}/raw_traces.pdf")
     plt.show()
 
 
@@ -163,7 +173,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
 
     # Save and show the plot
     plt.savefig(f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight")
-    plt.savefig("/root/capsule/results/CMOS_Floor.pdf")
+    plt.savefig(f"{results_folder}/CMOS_Floor.pdf")
     plt.show()
 
 
@@ -185,9 +195,9 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     plt.ylabel("counts")
     plt.xlabel("ms")
 
-    save_path = results_folder / "SyncPulseDiff.png"
     # Save and show the plot
-    plt.savefig(save_path)
+    plt.savefig(f"{results_folder}/SyncPulseDiff.png")
+    plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
     plt.show()
 
 
@@ -248,12 +258,7 @@ def main():
     )
 
     # Plot data
-    plot_data(
-        [data1[:, i + 1] for i in range(4)] + [data2[:, i + 1] for i in range(4)],
-        ["darkgreen"] * 4 + ["magenta"] * 4,
-        [f"GreenCh ROI: {i}" for i in range(4)] + [f"RedCh ROI: {i}" for i in range(4)],
-        results_folder / "raw_traces.png",
-    )
+    plot_cmos_trace_data(data_list = [data1,data2], colors = ['darkgreen', 'magenta'], results_folder = results_folder)
     plot_sensor_floor(data1, data2, data3, results_folder)
     plot_sync_pulse_diff(rising_time, results_folder)
 
@@ -272,7 +277,7 @@ def main():
                             metrics["IsDataSizeSame"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="raw_traces.png",
+                    referenc=str(results_folder /"raw_traces.png"),
                 )
             ],
         ),
@@ -288,7 +293,7 @@ def main():
                             metrics["IsDataSizeSame"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="raw_traces.png",
+                    reference=str(results_folder / "raw_traces.png"),
                 ),
                 QCMetric(
                     name="Session length >15min",
@@ -299,7 +304,7 @@ def main():
                             t=datetime.now(timezone.utc),
                         )
                     ],
-                    reference="raw_traces.png",
+                    reference=str(results_folder / "raw_traces.png"),
                 ),
             ],
         ),
@@ -315,7 +320,7 @@ def main():
                             metrics["IsSyncPulseSame"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="SyncPulseDiff.png",
+                    reference=str(results_folder / "SyncPulseDiff.png"),
                 ),
                 QCMetric(
                     name="Data length same (Falling)",
@@ -326,7 +331,7 @@ def main():
                             t=datetime.now(timezone.utc),
                         )
                     ],
-                    reference="SyncPulseDiff.png",
+                    reference=str(results_folder / "SyncPulseDiff.png"),
                 ),
             ],
             allow_failed=True,
@@ -371,7 +376,7 @@ def main():
                             metrics["CMOSFloorDark_Green"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="CMOS_Floor.png",
+                    reference=str(results_folder / "CMOS_Floor.png"),
                 ),
                 QCMetric(
                     name="Floor average signal in Iso channel",
@@ -381,7 +386,7 @@ def main():
                             metrics["CMOSFloorDark_Iso"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="CMOS_Floor.png",
+                    reference=str(results_folder / "CMOS_Floor.png"),
                 ),
                 QCMetric(
                     name="Floor average signal in Red channel",
@@ -391,7 +396,7 @@ def main():
                             metrics["CMOSFloorDark_Red"], t=datetime.now(timezone.utc)
                         )
                     ],
-                    reference="CMOS_Floor.png",
+                    reference=str(results_folder / "CMOS_Floor.png"),
                 ),
             ],
         ),
