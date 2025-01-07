@@ -112,19 +112,18 @@ def plot_cmos_trace_data(data_list, colors, results_folder):
     data2 = data_list[1]
     plt.figure(figsize=(8, 4))
     for i_panel in range(4):
-        plt.subplot(2, 4, i_panel + 1)
+        plt.subplot(8, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
         plt.title("GreenCh ROI:" + str(i_panel))
         plt.xlabel("frames")
         plt.ylabel("CMOS pixel val")
 
     for i_panel in range(4):
-        plt.subplot(2, 4, i_panel + 5)
+        plt.subplot(8, 1, i_panel + 5)
         plt.plot(data2[:, i_panel + 1], color=colors[1])
         plt.title("RedCh ROI:" + str(i_panel))
         plt.xlabel("frames")
         plt.ylabel("CMOS pixel val")
-    plt.subplots_adjust(wspace=0.8, hspace=0.8)
     plt.savefig(f"{results_folder}/raw_traces.png")
     plt.savefig(f"{results_folder}/raw_traces.pdf")
     plt.show()
