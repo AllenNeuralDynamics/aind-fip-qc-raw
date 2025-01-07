@@ -15,7 +15,6 @@ import kachery_cloud as kcl
 from aws_requests_auth.aws_auth import AWSRequestsAuth
 import argparse 
 from pathlib import Path
-#import logging
 from aind_log_utils.log import setup_logging
 from aind_data_access_api.document_db import MetadataDbClient
 from aind_data_schema_models.modalities import Modality
@@ -41,9 +40,10 @@ if __name__ == "__main__":
         asset_name = None
         
     if asset_name is not None:
-        fiber_raw_path = Path("/data/fiber_raw_data")
+        fiber_base_path = Path("/data/fiber_raw_data")
+        fiber_raw_path = fiber_base_path / "fib"
         # Load subject data
-        subject_json_path = fiber_raw_path / "subject.json"
+        subject_json_path = fiber_base_path / "subject.json"
         with open(subject_json_path, "r") as f:
             subject_data = json.load(f)
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             raise ValueError("subject_id is missing from the subject_data.")
 
         # Load data description
-        data_description_path = fiber_raw_path / "data_description.json"
+        data_description_path = fiber_base_path / "data_description.json"
         with open(data_description_path, "r") as f:
             date_data = json.load(f)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
         # Fallback to session start time if date is missing
         if date is None:
-            session_path = fiber_raw_path / "session.json"
+            session_path = fiber_base_path / "session.json"
             with open(session_path, "r") as f:
                 session_data = json.load(f)
             date = session_data.get("session_start_time", None)
@@ -75,13 +75,12 @@ if __name__ == "__main__":
 
 
 
-        #need to skip the entire QC if FIP files don't exist
         try:
-            file1  = glob.glob(fiber_raw_path + os.sep + "FIP_DataG*")[0]
-            file2 = glob.glob(fiber_raw_path + os.sep + "FIP_DataIso_*")[0]
-            file3 = glob.glob(fiber_raw_path + os.sep + "FIP_DataR_*")[0]
+            file1 = next(fiber_raw_path.glob("FIP_DataG*"))
+            file2 = next(fiber_raw_path.glob("FIP_DataIso_*"))
+            file3 = next(fiber_raw_path.glob("FIP_DataR_*"))
         except:
-            #logging.info("FIP Data don't exist, skipping the QC capsule")
+            logging.info("FIP Data don't exist, skipping the QC capsule")
             sys.exit(1)
 
         with open(file1) as f:
@@ -103,7 +102,7 @@ if __name__ == "__main__":
             #del datatemp
 
         #%% read behavior json file
-        behavior_json_path = glob.glob(sessionfolder + '/behavior/*' + sessionname + '.json')[0]
+        behavior_json_path = next(fiber_base_path.glob("behavior/*.json"))
 
 
         try:
@@ -345,34 +344,3 @@ if __name__ == "__main__":
         qc = QualityControl(evaluations=qceval_list)
         qc.write_standard_file(output_directory="/results")
 
-
-        #%% DocDB
-
-        def query_docdb_id(asset_name: str):
-            """
-            Returns docdb_id for asset_name.
-            Returns empty string if asset is not found.
-            """
-
-            # Resolve DocDB id of data asset
-            API_GATEWAY_HOST = "api.allenneuraldynamics.org"
-            DATABASE = "metadata_index"
-            COLLECTION = "data_assets"
-
-            docdb_api_client = MetadataDbClient(
-            host=API_GATEWAY_HOST,
-            database=DATABASE,
-            collection=COLLECTION,
-            )
-
-            response = docdb_api_client.retrieve_docdb_records(
-            filter_query={"name": asset_name},
-            projection={"_id": 1},
-            )
-
-            if len(response) == 0:
-                return ""
-            docdb_id = response[0]["_id"]
-            return docdb_id
-
-        docdb_id = query_docdb_id(os.path.basename(sessionfoldername))
