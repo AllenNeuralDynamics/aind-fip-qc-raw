@@ -41,9 +41,9 @@ if __name__ == "__main__":
         asset_name = None
         
     if asset_name is not None:
-        fiber_json_path = Path("/data/fiber_raw_data")
+        fiber_raw_path = Path("/data/fiber_raw_data")
         # Load subject data
-        subject_json_path = fiber_json_path / "subject.json"
+        subject_json_path = fiber_raw_path / "subject.json"
         with open(subject_json_path, "r") as f:
             subject_data = json.load(f)
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             raise ValueError("subject_id is missing from the subject_data.")
 
         # Load data description
-        data_description_path = fiber_json_path / "data_description.json"
+        data_description_path = fiber_raw_path / "data_description.json"
         with open(data_description_path, "r") as f:
             date_data = json.load(f)
 
@@ -65,21 +65,21 @@ if __name__ == "__main__":
 
         # Fallback to session start time if date is missing
         if date is None:
-            session_path = fiber_json_path / "session.json"
+            session_path = fiber_raw_path / "session.json"
             with open(session_path, "r") as f:
                 session_data = json.load(f)
             date = session_data.get("session_start_time", None)
         asset_name = "behavior_" + subject_id + "_" + date
 
-        setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = asset_name)
+        setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name = asset_name)
 
 
 
         #need to skip the entire QC if FIP files don't exist
         try:
-            file1  = glob.glob(fibfolder + os.sep + "FIP_DataG*")[0]
-            file2 = glob.glob(fibfolder + os.sep + "FIP_DataIso_*")[0]
-            file3 = glob.glob(fibfolder + os.sep + "FIP_DataR_*")[0]
+            file1  = glob.glob(fiber_raw_path + os.sep + "FIP_DataG*")[0]
+            file2 = glob.glob(fiber_raw_path + os.sep + "FIP_DataIso_*")[0]
+            file3 = glob.glob(fiber_raw_path + os.sep + "FIP_DataR_*")[0]
         except:
             #logging.info("FIP Data don't exist, skipping the QC capsule")
             sys.exit(1)
