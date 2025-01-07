@@ -3,7 +3,6 @@ import csv
 import json
 import numpy as np
 from pathlib import Path
-import sys
 from datetime import datetime, timezone
 import matplotlib.pyplot as plt
 from aind_log_utils.log import setup_logging
@@ -36,8 +35,7 @@ def load_json_file(file_path):
         with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        logging.info(f"Error: {file_path} not found.")
-        sys.exit(1)
+        logging.error(f"Error: {file_path} not found.")
 
 
 def load_csv_data(file_path):
@@ -47,8 +45,7 @@ def load_csv_data(file_path):
             reader = csv.reader(f)
             return np.array([row for row in reader], dtype=np.float32)
     except FileNotFoundError:
-        logging.info(f"Error: {file_path} not found.")
-        sys.exit(1)
+        logging.error(f"Error: {file_path} not found.")
 
 
 def generate_metrics(
@@ -211,8 +208,7 @@ def main():
     subject_data = load_json_file(fiber_base_path / "subject.json")
     subject_id = subject_data.get("subject_id")
     if not subject_id:
-        logging.info("Error: Subject ID is missing from subject.json.")
-        sys.exit(1)
+        logging.error("Error: Subject ID is missing from subject.json.")
 
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
@@ -224,8 +220,7 @@ def main():
             for fiber_channel in ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
         ]
     except StopIteration:
-        logging.info("Error: FIP data files are missing.")
-        sys.exit(1)
+        logging.error("Error: FIP data files are missing.")
 
     data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 

@@ -2,10 +2,6 @@
 	"version": 1,
 	"attached_datasets": [
 		{
-			"id": "6d382560-eec0-4ed1-bb08-544804414fb8",
-			"mount": "Old"
-		},
-		{
 			"id": "c7b99098-8f52-4c60-b9b1-9026c5a8e4c5",
 			"mount": "fiber_raw_data"
 		}
