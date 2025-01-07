@@ -214,13 +214,8 @@ def main():
         logging.info("Error: Subject ID is missing from subject.json.")
         sys.exit(1)
 
-    date_data = load_json_file(fiber_base_path / "data_description.json")
-    date = date_data.get("creation_time")
-    if not date:
-        session_data = load_json_file(fiber_base_path / "session.json")
-        date = session_data.get("session_start_time")
-
-    asset_name = f"behavior_{subject_id}_{date}"
+    data_disc_json = load_json_file(fiber_base_path / "data_description.json")
+    asset_name = data_disc_json.get("name")
     setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
 
     try:
