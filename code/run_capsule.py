@@ -1,417 +1,405 @@
-""" top level run script """
-
-#%% Import
+import logging
 import csv
-import glob
 import json
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import numpy as np
-import os
-from datetime import datetime, timezone
-import boto3
-import requests
-import kachery_cloud as kcl
-from aws_requests_auth.aws_auth import AWSRequestsAuth
-import argparse 
 from pathlib import Path
-#import logging
+from datetime import datetime, timezone
+import pytz
+import matplotlib.pyplot as plt
 from aind_log_utils.log import setup_logging
-from aind_data_access_api.document_db import MetadataDbClient
+from aind_data_schema.core.quality_control import (
+    QCEvaluation,
+    QCMetric,
+    QCStatus,
+    Stage,
+    Status,
+    QualityControl,
+)
 from aind_data_schema_models.modalities import Modality
-from aind_data_schema.core.quality_control import QCEvaluation, QualityControl, QCMetric, Stage, Status, QCStatus
 
 
-if __name__ == "__main__": 
-    parser = argparse.ArgumentParser(description="aind-fip-qc-raw")
+def Bool2Status(boolean_value, t=None):
+    """Convert a boolean value to a QCStatus object."""
+    if boolean_value:
+        return QCStatus(
+            evaluator="Automated", status=Status.PASS, timestamp=t.isoformat()
+        )
+    else:
+        return QCStatus(
+            evaluator="Automated", status=Status.FAIL, timestamp=t.isoformat()
+        )
 
-    data_folder = Path("../data")
+
+def load_json_file(file_path):
+    """Load JSON data from a file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logging.error(f"Error: {file_path} not found.")
+
+
+def load_csv_data(file_path):
+    """Load CSV data into a NumPy array."""
+    try:
+        with open(file_path) as f:
+            reader = csv.reader(f)
+            return np.array([row for row in reader], dtype=np.float32)
+    except FileNotFoundError:
+        logging.error(f"Error: {file_path} not found.")
+
+
+def generate_metrics(
+    data1,
+    data2,
+    data3,
+    rising_time,
+    falling_time,
+    green_floor_ave,
+    iso_floor_ave,
+    red_floor_ave,
+):
+    """Generate QC metrics based on data."""
+    """Limits are set to 265 for all CMOSFloorDark metrics."""
+    CMOSFloorDark_Green_Limit = 265
+    CMOSFloorDark_Iso_Limit = 265
+    CMOSFloorDark_Red_Limit = 265
+    sudden_change_limit = 5000
+    metrics = {
+        "IsDataSizeSame": len(data1) == len(data2) == len(data3),
+        "IsDataLongerThan15min": len(data1) > 18000,
+        "IsSyncPulseSame": len(rising_time) == len(falling_time),
+        "IsSyncPulseSameAsData": len(rising_time)
+        in [len(data1), len(data2), len(data3)],
+        "NoGreenNan": not np.isnan(data1).any(),
+        "NoIsoNan": not np.isnan(data2).any(),
+        "NoRedNan": not np.isnan(data3).any(),
+        "CMOSFloorDark_Green": green_floor_ave < CMOSFloorDark_Green_Limit,
+        "CMOSFloorDark_Iso": iso_floor_ave < CMOSFloorDark_Iso_Limit,
+        "CMOSFloorDark_Red": red_floor_ave < CMOSFloorDark_Red_Limit,
+        "NoSuddenChangeInSignal": all(
+            np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
+            for data in [data1, data2, data3]
+        ),
+    }
+    return metrics
+
+
+def create_evaluation(
+    name,
+    description,
+    metrics,
+    modality=Modality.FIB,
+    stage=Stage.RAW,
+    allow_failed=False,
+):
+    """Create a QC evaluation object."""
+    return QCEvaluation(
+        name=name,
+        modality=modality,
+        stage=stage,
+        metrics=metrics,
+        allow_failed_metrics=allow_failed,
+        description=description,
+    )
+
+
+def plot_cmos_trace_data(data_list, colors, results_folder):
+    """Plot raw frame and cmos data and save to a file."""
+    data1 = data_list[0]
+    data2 = data_list[1]
+    plt.figure(figsize=(8, 4))
+    for i_panel in range(4):
+        plt.subplot(8, 1, i_panel + 1)
+        plt.plot(data1[:, i_panel + 1], color=colors[0])
+        plt.title("GreenCh ROI:" + str(i_panel))
+        plt.xlabel("frames")
+        plt.ylabel("CMOS pixel val")
+
+    for i_panel in range(4):
+        plt.subplot(8, 1, i_panel + 5)
+        plt.plot(data2[:, i_panel + 1], color=colors[1])
+        plt.title("RedCh ROI:" + str(i_panel))
+        plt.xlabel("frames")
+        plt.ylabel("CMOS pixel val")
+    plt.savefig(f"{results_folder}/raw_traces.png")
+    plt.savefig(f"{results_folder}/raw_traces.pdf")
+    plt.show()
+
+
+def plot_sensor_floor(data1, data2, data3, results_folder):
+    """
+    Plot histograms for sensor floor values of three data sets.
+
+    Parameters:
+        data1 (numpy.ndarray): Data for GreenCh.
+        data2 (numpy.ndarray): Data for IsoCh.
+        data3 (numpy.ndarray): Data for RedCh.
+        results_folder (str): Path to save the output plots.
+    """
+    plt.figure(figsize=(8, 2))
+
+    # GreenCh Floor
+    plt.subplot(1, 3, 1)
+    plt.hist(data1[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
+    plt.xlim(255, 270)
+    GreenChFloorAve = np.mean(data1[:, -1])
+    plt.title(f"GreenCh FloorAve: {GreenChFloorAve:.2f}")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
+    # IsoCh Floor
+    plt.subplot(1, 3, 2)
+    plt.hist(data2[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
+    plt.xlim(255, 270)
+    IsoChFloorAve = np.mean(data2[:, -1])
+    plt.title(f"IsoCh FloorAve: {IsoChFloorAve:.2f}")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
+    # RedCh Floor
+    plt.subplot(1, 3, 3)
+    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
+    plt.xlim(255, 270)
+    RedChFloorAve = np.mean(data3[:, -1])
+    plt.title(f"RedCh FloorAve: {RedChFloorAve:.2f}")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
+    plt.subplots_adjust(wspace=0.8)
+
+    # Save and show the plot
+    plt.savefig(f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"{results_folder}/CMOS_Floor.pdf")
+    plt.show()
+
+
+def plot_sync_pulse_diff(rising_time, results_folder):
+    """
+    Plot a histogram of the differences in rising times and save the plot.
+
+    Parameters:
+        rising_time (array-like): An array of rising time values.
+        save_path (str): The path to save the generated plot.
+    """
+    # Compute differences
+    diffs = np.diff(rising_time)
+
+    # Create the plot
+    plt.figure()
+    plt.hist(diffs, bins=100, range=(0, 0.2))
+    plt.title("sync pulse diff")
+    plt.ylabel("counts")
+    plt.xlabel("ms")
+
+    # Save and show the plot
+    plt.savefig(f"{results_folder}/SyncPulseDiff.png")
+    plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
+    plt.show()
+
+
+def main():
+    # Paths and setup
+    fiber_base_path = Path("/data/fiber_raw_data")
+    fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results")
+    results_folder.mkdir(parents=True, exist_ok=True)
 
-    parser.add_argument("--asset-name", type=str, default = 'behavior_754430_2024-12-19_13-05-45')
+    # Load JSON files
+    subject_data = load_json_file(fiber_base_path / "subject.json")
+    subject_id = subject_data.get("subject_id")
+    if not subject_id:
+        logging.error("Error: Subject ID is missing from subject.json.")
 
-    # Parse the command-line arguments
-    args = parser.parse_args()
-    asset_name = args.asset_name
+    data_disc_json = load_json_file(fiber_base_path / "data_description.json")
+    asset_name = data_disc_json.get("name")
+    setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
 
-    if not results_folder.is_dir():
-        results_folder.mkdir(parents=True)
+    try:
+        channel_file_paths = [
+            next(fiber_raw_path.glob(fiber_channel))
+            for fiber_channel in ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
+        ]
+    except StopIteration:
+        logging.error("Error: FIP data files are missing.")
 
-    if asset_name is not None and asset_name == "":
-        asset_name = None
-        
-    if asset_name is not None:
+    data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
-        sessionfolder = str(data_folder / asset_name)
+    # Load behavior JSON
+    behavior_json = load_json_file(next(fiber_base_path.glob("behavior/*.json")))
+    rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
+    falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
 
-        sessionname = sessionfolder.split('behavior_')[1]
-        sessionfoldername = os.path.basename(sessionfolder)
-        mouse_id = sessionname.split('_')[0]
-        fibfolder = sessionfolder + '/fib'
+    # Calculate floor averages
+    green_floor_ave = np.mean(data1[:, -1])
+    iso_floor_ave = np.mean(data2[:, -1])
+    red_floor_ave = np.mean(data3[:, -1])
 
-        #print('sessionfolder: ' + sessionfolder)
-        #print('sessionfoldername: ' + sessionfoldername)
-        #print('mouse_id: ' + mouse_id)
-        #print('fibfolder: ' + fibfolder)
+    # Generate metrics
+    metrics = generate_metrics(
+        data1,
+        data2,
+        data3,
+        rising_time,
+        falling_time,
+        green_floor_ave,
+        iso_floor_ave,
+        red_floor_ave,
+    )
 
-        #setup_logging("aind-fip-qc-raw", mouse_id=mouse_id, session_name = sessionname)
-        t = datetime.now(timezone.utc)
+    # Plot data
+    plot_cmos_trace_data(
+        data_list=[data1, data2],
+        colors=["darkgreen", "magenta"],
+        results_folder=results_folder,
+    )
+    plot_sensor_floor(data1, data2, data3, results_folder)
+    plot_sync_pulse_diff(rising_time, results_folder)
 
-
-        #need to skip the entire QC if FIP files don't exist
-        try:
-            file1  = glob.glob(fibfolder + os.sep + "FIP_DataG*")[0]
-            file2 = glob.glob(fibfolder + os.sep + "FIP_DataIso_*")[0]
-            file3 = glob.glob(fibfolder + os.sep + "FIP_DataR_*")[0]
-        except:
-            #logging.info("FIP Data don't exist, skipping the QC capsule")
-            sys.exit(1)
-
-        with open(file1) as f:
-            reader = csv.reader(f)
-            datatemp = np.array([row for row in reader])
-            data1 = datatemp[:,:].astype(np.float32)
-            #del datatemp
-            
-        with open(file2) as f:
-            reader = csv.reader(f)
-            datatemp = np.array([row for row in reader])
-            data2 = datatemp[:,:].astype(np.float32)
-            #del datatemp
-            
-        with open(file3) as f:
-            reader = csv.reader(f)
-            datatemp = np.array([row for row in reader])
-            data3 = datatemp[:,:].astype(np.float32)
-            #del datatemp
-
-        #%% read behavior json file
-        behavior_json_path = glob.glob(sessionfolder + '/behavior/*' + sessionname + '.json')[0]
-
-
-        try:
-            with open(behavior_json_path, 'r', encoding='utf-8') as f:
-                behavior_json = json.load(f)
-        except:
-            #logging.info("behavior json file don't exist, skipping the QC capsule")
-            sys.exit(1)        
-
-        RisingTime=behavior_json['B_PhotometryRisingTimeHarp']
-        FallingTime=behavior_json['B_PhotometryFallingTimeHarp']
-
-        #%%raw data
-        plt.figure(figsize=(8, 4))
-        for i_panel in range(4):
-            plt.subplot(2,4,i_panel+1)
-            plt.plot(data1[:,i_panel+1],color='darkgreen')
-            plt.title('GreenCh ROI:' + str(i_panel))
-            plt.xlabel('frames')
-            plt.ylabel('CMOS pixel val')
-
-        for i_panel in range(4):
-            plt.subplot(2,4,i_panel+5)
-            plt.plot(data2[:,i_panel+1],color='magenta')
-            plt.title('RedCh ROI:' + str(i_panel))
-            plt.xlabel('frames')
-            plt.ylabel('CMOS pixel val')
-
-        plt.subplots_adjust(wspace=0.8, hspace=0.8)
-
-        plt.show()
-        plt.savefig(str(results_folder) + '/raw_traces.png')
-        plt.savefig('/root/capsule/results/raw_traces.pdf')
-
-        #%%
-        #sensor floor (last ROI)
-        plt.figure(figsize=(8, 2))
-
-        plt.subplot(1,3,1)
-        plt.hist(data1[:,-1],bins=100, range=(255, 270))
-        plt.xlim(255,270)
-        GreenChFloorAve=np.mean(data1[:,-1])
-        plt.title('GreenCh FloorAve:' + str(GreenChFloorAve))
-        plt.xlabel('CMOS pixel val')
-        plt.ylabel('counts')
-
-        plt.subplot(1,3,2)
-        plt.hist(data2[:,-1],bins=100, range=(255, 270))
-        plt.xlim(255,270)
-        IsoChFloorAve=np.mean(data2[:,-1])
-        plt.title('IsoCh FloorAve:' + str(IsoChFloorAve))
-        plt.xlabel('CMOS pixel val')
-        plt.ylabel('counts')
-
-        plt.subplot(1,3,3)
-        plt.hist(data3[:,-1],bins=100, range=(255, 270))
-        plt.xlim(255,270)
-        RedChFloorAve=np.mean(data3[:,-1])
-        plt.title('RedCh FloorAve:' + str(RedChFloorAve))
-        plt.xlabel('CMOS pixel val')
-        plt.ylabel('counts')
-
-        plt.subplots_adjust(wspace=0.8)
-
-        plt.show()
-        plt.savefig(str(results_folder) + '/CMOS_Floor.png',dpi=300, bbox_inches='tight')
-        plt.savefig('/root/capsule/results/CMOS_Floor.pdf')
-
-        #%% sync pulse diff
-        plt.figure()
-        plt.hist(np.diff(RisingTime), bins=100, range=(0, 0.2))
-        plt.title("sync pulse diff")
-        plt.ylabel("counts")
-        plt.xlabel("ms")
-
-        plt.show()
-        plt.savefig('/root/capsule/results/SyncPulseDiff.png')
-
-        #%%
-
-        def get_kachery_secrets():
-            """Obtains the three kachery-cloud environment keys/secrets"""
-            secret_name = "/aind/prod/kachery/credentials"
-            region_name = "us-west-2"
-
-            # Create a Secrets Manager client
-            session = boto3.session.Session()
-            client = session.client(
-                service_name='secretsmanager',
-                region_name=region_name
-            )
-
-            try:
-                get_secret_value_response = client.get_secret_value(
-                    SecretId=secret_name
+    # Create evaluations with our timezone
+    seattle_tz = pytz.timezone("America/Los_Angeles")
+    evaluations = [
+        create_evaluation(
+            "Data length check",
+            "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
+            [
+                QCMetric(
+                    name="Data length same",
+                    value=len(data1),
+                    status_history=[
+                        Bool2Status(
+                            metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    referenc=str(results_folder / "raw_traces.png"),
                 )
-            except ClientError as e:
-                # For a list of exceptions thrown, see
-                # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
-                raise e
-
-            secret = get_secret_value_response['SecretString']
-            
-            kachery_secrets = json.loads(secret)
-
-            os.environ['KACHERY_ZONE'] = kachery_secrets['KACHERY_ZONE']
-            os.environ['KACHERY_CLOUD_CLIENT_ID'] = kachery_secrets['KACHERY_CLOUD_CLIENT_ID']
-            os.environ['KACHERY_CLOUD_PRIVATE_KEY'] = kachery_secrets['KACHERY_CLOUD_PRIVATE_KEY']
-
-        get_kachery_secrets()
-
-        # %%
-        file_path0 = "/root/capsule/results/raw_traces.png"
-        uri0 = kcl.store_file(file_path0, label=file_path0)
-
-        file_path1 = "/root/capsule/results/CMOS_Floor.png"
-        uri1 = kcl.store_file(file_path1, label=file_path1)
-
-        file_path2 = "/root/capsule/results/SyncPulseDiff.png"
-        uri2 = kcl.store_file(file_path2, label=file_path2)
-
-        #%%
-        Metrics = dict()
-
-        if len(data1) == len(data2) and len(data2) == len(data3):
-            Metrics["IsDataSizeSame"] = True
-        else:
-            Metrics["IsDataSizeSame"] = False
-            #logging.info("DataSizes are not the same")
-
-        if len(data1) > 18000:
-            Metrics["IsDataLongerThan15min"] = True
-        else:
-            Metrics["IsDataLongerThan15min"] = False
-            #logging.info("The session is shorter than 15min")
-
-        if len(RisingTime) == len(FallingTime):
-            Metrics["IsSyncPulseSame"] = True
-        else:
-            Metrics["IsSyncPulseSame"] = False
-            #logging.info("# of Rising and Falling sync pulses are not the same")
-
-        if len(RisingTime) == len(data1) or len(RisingTime) == len(data2) or len(RisingTime) == len(data3):
-            Metrics["IsSyncPulseSameAsData"] = True
-        else:
-            Metrics["IsSyncPulseSameAsData"] = False
-            #logging.info("# of sync pulses are not the same as Data")
-
-        if np.isnan(data1).any():
-            Metrics["NoGreenNan"] = False
-            #logging.info("Green Ch has NaN")
-        else:
-            Metrics["NoGreenNan"] = True
-
-        if np.isnan(data2).any():
-            Metrics["NoIsoNan"] = False
-            #logging.info("Green Ch has NaN")
-        else:
-            Metrics["NoIsoNan"] = True
-
-        if np.isnan(data1).any():
-            Metrics["NoRedNan"] = False
-            #logging.info("Red Ch has NaN")
-        else:
-            Metrics["NoRedNan"] = True
-
-
-        if GreenChFloorAve < 265:
-            Metrics["CMOSFloorDark_Green"] = True
-        else:
-            Metrics["CMOSFloorDark_Green"] = False
-            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
-
-        if IsoChFloorAve < 265:
-            Metrics["CMOSFloorDark_Iso"] = True
-        else:
-            Metrics["CMOSFloorDark_Iso"] = False
-            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
-
-        if RedChFloorAve < 265:
-            Metrics["CMOSFloorDark_Red"] = True
-        else:
-            Metrics["CMOSFloorDark_Red"] = False
-            #logging.info("CMOS Floor is not dark; potential light leak or error in ROI allocation")
-
-
-        if np.max(np.diff(data1[10:-2,1])) < 5000 and np.max(np.diff(data2[10:-2,1])) < 5000 and np.max(np.diff(data3[10:-2,1])) < 5000:
-            Metrics["NoSuddenChangeInSignal"] = True
-        else:
-            Metrics["NoSuddenChangeInSignal"] = False
-            #logging.info("Sudden change in signal; potential movement in fiber coupling and etc")
-
-
-        #%% AIND QC schema embeding
-        t = datetime.now(timezone.utc)
-
-        # Build some status objects
-        sp = QCStatus(evaluator="Automated", status=Status.PASS, timestamp=t.isoformat())
-        sf = QCStatus(evaluator="Automated", status=Status.FAIL, timestamp=t.isoformat())
-        spend = QCStatus(evaluator="Automated", status=Status.PENDING, timestamp=t.isoformat())
-
-        def Bool2Status(boolean_value):
-            if boolean_value:
-                return QCStatus(evaluator="Automated", status=Status.PASS, timestamp=t.isoformat())
-            else:
-                return QCStatus(evaluator="Automated", status=Status.FAIL, timestamp=t.isoformat())
-
-        eval0 = QCEvaluation(
-            name="Data length check",
-            modality=Modality.FIB,
-            stage=Stage.RAW,
-            metrics=[
-                QCMetric(name="Data length same", value=len(data1), status_history=[Bool2Status(Metrics["IsDataSizeSame"])], reference=uri0),
-                QCMetric(name="Session length >15min", value=len(data1)/20/60, status_history=[Bool2Status(Metrics["IsDataLongerThan15min"])], reference=uri0)
             ],
-            description="Pass when GreenCh_data_length==IsoCh_data_length and GreenCh_data_length==RedCh_data_length, and the session is >15min",
-        )
-
-        eval1 = QCEvaluation(
-            name="Complete Synchronization Pulse",
-            modality=Modality.FIB,
-            stage=Stage.RAW,
-            metrics=[
-                QCMetric(name="Data length same", value=len(RisingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSame"])],reference=uri2),
-                QCMetric(name="Data length same", value=len(FallingTime), status_history=[Bool2Status(Metrics["IsSyncPulseSameAsData"])],reference=uri2) 
+        ),
+        create_evaluation(
+            "Data length check",
+            "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
+            [
+                QCMetric(
+                    name="Data length same",
+                    value=len(data1),
+                    status_history=[
+                        Bool2Status(
+                            metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    reference=str(results_folder / "raw_traces.png"),
+                ),
+                QCMetric(
+                    name="Session length >15min",
+                    value=len(data1) / 20 / 60,
+                    status_history=[
+                        Bool2Status(
+                            metrics["IsDataLongerThan15min"],
+                            t=datetime.now(seattle_tz),
+                        )
+                    ],
+                    reference=str(results_folder / "raw_traces.png"),
+                ),
             ],
-            allow_failed_metrics=True, # most incoplete sync pulses can be fixed/recovered during preprocessing (alignment module)
-            description="Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
-        )
-
-        eval2 = QCEvaluation(
-            name="No NaN values in data",
-            modality=Modality.FIB,
-            stage=Stage.RAW,
-            metrics=[
-                QCMetric(name="No NaN in Green channel", value=float(np.sum(np.isnan(data1))), status_history=[Bool2Status(Metrics["NoGreenNan"])]),
-                QCMetric(name="No NaN in Iso channel", value=float(np.sum(np.isnan(data2))), status_history=[Bool2Status(Metrics["NoIsoNan"])]),
-                QCMetric(name="No NaN in Red channel", value=float(np.sum(np.isnan(data3))), status_history=[Bool2Status(Metrics["NoRedNan"])])
+        ),
+        create_evaluation(
+            "Complete Synchronization Pulse",
+            "Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
+            [
+                QCMetric(
+                    name="Data length same (Rising)",
+                    value=len(rising_time),
+                    status_history=[
+                        Bool2Status(
+                            metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    reference=str(results_folder / "SyncPulseDiff.png"),
+                ),
+                QCMetric(
+                    name="Data length same (Falling)",
+                    value=len(falling_time),
+                    status_history=[
+                        Bool2Status(
+                            metrics["IsSyncPulseSameAsData"],
+                            t=datetime.now(seattle_tz),
+                        )
+                    ],
+                    reference=str(results_folder / "SyncPulseDiff.png"),
+                ),
             ],
-            allow_failed_metrics=False,
-            description="Pass when no NaN values in the data"
-        )
-
-        eval3 = QCEvaluation(
-            name="CMOS Floor signal",
-            modality=Modality.FIB,
-            stage=Stage.RAW,
-            metrics=[
-                QCMetric(name="Floor average signal in Green channel", value=float(GreenChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Green"])],reference=uri1),
-                QCMetric(name="Floor average signal in Iso channel", value=float(IsoChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Iso"])],reference=uri1),
-                QCMetric(name="Floor average signal in Red channel", value=float(RedChFloorAve), status_history=[Bool2Status(Metrics["CMOSFloorDark_Red"])],reference=uri1)
+            allow_failed=True,
+        ),
+        create_evaluation(
+            "No NaN values in data",
+            "Pass when no NaN values in the data",
+            [
+                QCMetric(
+                    name="No NaN in Green channel",
+                    value=float(np.sum(np.isnan(data1))),
+                    status_history=[
+                        Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
+                    ],
+                ),
+                QCMetric(
+                    name="No NaN in Iso channel",
+                    value=float(np.sum(np.isnan(data2))),
+                    status_history=[
+                        Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
+                    ],
+                ),
+                QCMetric(
+                    name="No NaN in Red channel",
+                    value=float(np.sum(np.isnan(data3))),
+                    status_history=[
+                        Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
+                    ],
+                ),
             ],
-            allow_failed_metrics=False,
-            description="Pass when CMOS dark floor is <265 in all channel"
-        )
-
-        eval4 = QCEvaluation(
-            name="Sudden change in signal",
-            modality=Modality.FIB,
-            stage=Stage.RAW,
-            metrics=[
-                QCMetric(name="1st derivative of Green channel", value=float(np.max(np.diff(data1[10:-2,1]))), status_history=[Bool2Status(Metrics["NoSuddenChangeInSignal"])],reference=uri0)
+            allow_failed=False,
+        ),
+        create_evaluation(
+            "CMOS Floor signal",
+            "Pass when CMOS dark floor is <265 in all channel",
+            [
+                QCMetric(
+                    name="Floor average signal in Green channel",
+                    value=float(green_floor_ave),
+                    status_history=[
+                        Bool2Status(
+                            metrics["CMOSFloorDark_Green"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    reference=str(results_folder / "CMOS_Floor.png"),
+                ),
+                QCMetric(
+                    name="Floor average signal in Iso channel",
+                    value=float(iso_floor_ave),
+                    status_history=[
+                        Bool2Status(
+                            metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    reference=str(results_folder / "CMOS_Floor.png"),
+                ),
+                QCMetric(
+                    name="Floor average signal in Red channel",
+                    value=float(red_floor_ave),
+                    status_history=[
+                        Bool2Status(
+                            metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
+                        )
+                    ],
+                    reference=str(results_folder / "CMOS_Floor.png"),
+                ),
             ],
-            allow_failed_metrics=True,
-            description="Pass when 1st derivatives of signals are < 5000"
-        )
+        ),
+    ]
 
-        qceval_list = [eval0, eval1, eval2, eval3, eval4]
-        qc = QualityControl(evaluations=qceval_list)
-        qc.write_standard_file(output_directory="/results")
+    # Create QC object and save
+    qc = QualityControl(evaluations=evaluations)
+    qc.write_standard_file(output_directory=str(results_folder))
 
 
-        #%% DocDB
-
-        def query_docdb_id(asset_name: str):
-            """
-            Returns docdb_id for asset_name.
-            Returns empty string if asset is not found.
-            """
-
-            # Resolve DocDB id of data asset
-            API_GATEWAY_HOST = "api.allenneuraldynamics.org"
-            DATABASE = "metadata_index"
-            COLLECTION = "data_assets"
-
-            docdb_api_client = MetadataDbClient(
-            host=API_GATEWAY_HOST,
-            database=DATABASE,
-            collection=COLLECTION,
-            )
-
-            response = docdb_api_client.retrieve_docdb_records(
-            filter_query={"name": asset_name},
-            projection={"_id": 1},
-            )
-
-            if len(response) == 0:
-                return ""
-            docdb_id = response[0]["_id"]
-            return docdb_id
-
-        docdb_id = query_docdb_id(os.path.basename(sessionfoldername))
-
-        #%% push to DocDB
-        session = boto3.Session()
-        credentials = session.get_credentials()
-        host = "api.allenneuraldynamics.org"
-
-        auth = AWSRequestsAuth(
-        aws_access_key=credentials.access_key,
-        aws_secret_access_key=credentials.secret_key,
-        aws_token=credentials.token,
-        aws_host="api.allenneuraldynamics.org",
-        aws_region='us-west-2',
-        aws_service='execute-api'
-        )
-        url = f"https://{host}/v1/add_qc_evaluation"
-
-        for eval_ii in qceval_list:
-            post_request_content = {"data_asset_id": docdb_id,
-                                    "qc_evaluation": eval_ii.model_dump(mode='json')}
-
-            response = requests.post(url=url, auth=auth, 
-                                    json=post_request_content)
-
-            if response.status_code != 200:
-                print(response.status_code)
-                print(response.text)
+if __name__ == "__main__":
+    main()
