@@ -256,7 +256,7 @@ def main():
     plot_sensor_floor(data1, data2, data3, results_folder)
     plot_sync_pulse_diff(rising_time, results_folder)
 
-    # Create evaluations with our timezone 
+    # Create evaluations with our timezone
     seattle_tz = pytz.timezone("America/Los_Angeles")
     evaluations = [
         create_evaluation(
