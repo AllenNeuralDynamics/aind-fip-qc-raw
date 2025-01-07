@@ -4,6 +4,7 @@ import json
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import matplotlib.pyplot as plt
 from aind_log_utils.log import setup_logging
 from aind_data_schema.core.quality_control import (
@@ -267,7 +268,7 @@ def main():
                     value=len(data1),
                     status_history=[
                         Bool2Status(
-                            metrics["IsDataSizeSame"], t=datetime.now(timezone.utc)
+                            metrics["IsDataSizeSame"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     referenc=str(results_folder / "raw_traces.png"),
@@ -283,7 +284,7 @@ def main():
                     value=len(data1),
                     status_history=[
                         Bool2Status(
-                            metrics["IsDataSizeSame"], t=datetime.now(timezone.utc)
+                            metrics["IsDataSizeSame"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     reference=str(results_folder / "raw_traces.png"),
@@ -294,7 +295,7 @@ def main():
                     status_history=[
                         Bool2Status(
                             metrics["IsDataLongerThan15min"],
-                            t=datetime.now(timezone.utc),
+                            t = datetime.now(ZoneInfo("America/Los_Angeles"))),
                         )
                     ],
                     reference=str(results_folder / "raw_traces.png"),
@@ -310,7 +311,7 @@ def main():
                     value=len(rising_time),
                     status_history=[
                         Bool2Status(
-                            metrics["IsSyncPulseSame"], t=datetime.now(timezone.utc)
+                            metrics["IsSyncPulseSame"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     reference=str(results_folder / "SyncPulseDiff.png"),
@@ -321,7 +322,7 @@ def main():
                     status_history=[
                         Bool2Status(
                             metrics["IsSyncPulseSameAsData"],
-                            t=datetime.now(timezone.utc),
+                            t = datetime.now(ZoneInfo("America/Los_Angeles"))),
                         )
                     ],
                     reference=str(results_folder / "SyncPulseDiff.png"),
@@ -337,21 +338,21 @@ def main():
                     name="No NaN in Green channel",
                     value=float(np.sum(np.isnan(data1))),
                     status_history=[
-                        Bool2Status(metrics["NoGreenNan"], t=datetime.now(timezone.utc))
+                        Bool2Status(metrics["NoGreenNan"], t = datetime.now(ZoneInfo("America/Los_Angeles"))))
                     ],
                 ),
                 QCMetric(
                     name="No NaN in Iso channel",
                     value=float(np.sum(np.isnan(data2))),
                     status_history=[
-                        Bool2Status(metrics["NoIsoNan"], t=datetime.now(timezone.utc))
+                        Bool2Status(metrics["NoIsoNan"], t = datetime.now(ZoneInfo("America/Los_Angeles"))))
                     ],
                 ),
                 QCMetric(
                     name="No NaN in Red channel",
                     value=float(np.sum(np.isnan(data3))),
                     status_history=[
-                        Bool2Status(metrics["NoRedNan"], t=datetime.now(timezone.utc))
+                        Bool2Status(metrics["NoRedNan"], t = datetime.now(ZoneInfo("America/Los_Angeles"))))
                     ],
                 ),
             ],
@@ -366,7 +367,7 @@ def main():
                     value=float(green_floor_ave),
                     status_history=[
                         Bool2Status(
-                            metrics["CMOSFloorDark_Green"], t=datetime.now(timezone.utc)
+                            metrics["CMOSFloorDark_Green"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     reference=str(results_folder / "CMOS_Floor.png"),
@@ -376,7 +377,7 @@ def main():
                     value=float(iso_floor_ave),
                     status_history=[
                         Bool2Status(
-                            metrics["CMOSFloorDark_Iso"], t=datetime.now(timezone.utc)
+                            metrics["CMOSFloorDark_Iso"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     reference=str(results_folder / "CMOS_Floor.png"),
@@ -386,7 +387,7 @@ def main():
                     value=float(red_floor_ave),
                     status_history=[
                         Bool2Status(
-                            metrics["CMOSFloorDark_Red"], t=datetime.now(timezone.utc)
+                            metrics["CMOSFloorDark_Red"], t = datetime.now(ZoneInfo("America/Los_Angeles")))
                         )
                     ],
                     reference=str(results_folder / "CMOS_Floor.png"),
