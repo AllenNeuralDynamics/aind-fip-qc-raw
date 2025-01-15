@@ -217,14 +217,20 @@ def main():
     asset_name = data_disc_json.get("name")
     setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
 
-    try:
-        channel_file_paths = [
-            next(fiber_raw_path.glob(fiber_channel))
-            for fiber_channel in ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
-        ]
-    except StopIteration:
-        logging.info("FIP data files are missing. This may be a behavior session")
-        fiber_exists = False
+    # Assuming `fiber_raw_path` is defined earlier in the code
+    fiber_channel_patterns = ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
+
+    # Use a list comprehension to find matching files
+    channel_file_paths = [
+        next(fiber_raw_path.glob(fiber_channel), None)  # Default to None if no match
+        for fiber_channel in fiber_channel_patterns
+    ]
+
+    # Check if all required files exist
+    fiber_exists = all(channel_file_paths)
+
+    if not fiber_exists:
+        logging.info("FIP data files are missing. This may be a behavior session.")
     if fiber_exists:
         data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
