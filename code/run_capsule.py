@@ -1,6 +1,7 @@
 import logging
 import csv
 import json
+import sys
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone
@@ -221,7 +222,8 @@ def main():
             for fiber_channel in ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
         ]
     except StopIteration:
-        logging.error("Error: FIP data files are missing.")
+        logging.info("FIP data files are missing. This may be a behavior session")
+        sys.exit()        
 
     data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
