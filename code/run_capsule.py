@@ -229,8 +229,7 @@ def main():
     # Check if all required files exist
     fiber_exists = all(channel_file_paths)
 
-    if not fiber_exists:
-        logging.info("FIP data files are missing. This may be a behavior session.")
+
     if fiber_exists:
         data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
@@ -409,6 +408,7 @@ def main():
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
     else:
+        logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC") 
 
 
