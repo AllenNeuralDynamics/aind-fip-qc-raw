@@ -228,7 +228,6 @@ def main():
     # Check if all required files exist
     fiber_exists = all(channel_file_paths)
 
-
     if fiber_exists:
         data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
@@ -345,7 +344,9 @@ def main():
                         name="No NaN in Green channel",
                         value=float(np.sum(np.isnan(data1))),
                         status_history=[
-                            Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
+                            Bool2Status(
+                                metrics["NoGreenNan"], t=datetime.now(seattle_tz)
+                            )
                         ],
                     ),
                     QCMetric(
@@ -374,7 +375,8 @@ def main():
                         value=float(green_floor_ave),
                         status_history=[
                             Bool2Status(
-                                metrics["CMOSFloorDark_Green"], t=datetime.now(seattle_tz)
+                                metrics["CMOSFloorDark_Green"],
+                                t=datetime.now(seattle_tz),
                             )
                         ],
                         reference=str(results_folder / "CMOS_Floor.png"),
@@ -408,7 +410,7 @@ def main():
         qc.write_standard_file(output_directory=str(results_folder))
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
-        logging.info("No Fiber Data to QC") 
+        logging.info("No Fiber Data to QC")
 
 
 if __name__ == "__main__":
