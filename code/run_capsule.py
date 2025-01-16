@@ -1,10 +1,9 @@
 import logging
 import csv
 import json
-import sys
 import numpy as np
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 import pytz
 import matplotlib.pyplot as plt
 from aind_log_utils.log import setup_logging
