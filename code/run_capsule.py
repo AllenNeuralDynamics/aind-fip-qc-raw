@@ -411,6 +411,12 @@ def main():
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
+        qc_file_path = results_folder / "no_fip_to_qc.txt"
+        # Create an empty file
+        with open(qc_file_path, 'w') as file:
+            file.write("FIP data files are missing. This may be a behavior session.")
+
+        print(f"Empty file created at: {qc_file_path}")
 
 
 if __name__ == "__main__":
