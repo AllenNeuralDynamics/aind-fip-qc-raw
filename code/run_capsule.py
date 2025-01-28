@@ -233,6 +233,7 @@ def main():
         data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
         # Load behavior JSON
+        # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
         pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
         matching_behavior_files = glob.glob(pattern)
         if matching_behavior_files:
