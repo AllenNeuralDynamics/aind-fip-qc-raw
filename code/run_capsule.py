@@ -213,8 +213,6 @@ def main():
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
 
-
-
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
     setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
@@ -421,7 +419,7 @@ def main():
         logging.info("No Fiber Data to QC")
         qc_file_path = results_folder / "no_fip_to_qc.txt"
         # Create an empty file
-        with open(qc_file_path, 'w') as file:
+        with open(qc_file_path, "w") as file:
             file.write("FIP data files are missing. This may be a behavior session.")
 
         print(f"Empty file created at: {qc_file_path}")
