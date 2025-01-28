@@ -238,7 +238,7 @@ def main():
         pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
         matching_behavior_files = glob.glob(pattern)
         if matching_behavior_files:
-            behavior_json = load_json_file(next(fiber_base_path.glob("behavior/*.json")))
+            behavior_json = load_json_file(matching_behavior_files[0])
         else:
             logging.info("NO BEHAVIOR JSON")
         rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
