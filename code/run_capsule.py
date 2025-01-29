@@ -1,6 +1,7 @@
 import logging
 import csv
 import json
+import glob
 import numpy as np
 from pathlib import Path
 from datetime import datetime
@@ -232,7 +233,13 @@ def main():
         data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
 
         # Load behavior JSON
-        behavior_json = load_json_file(next(fiber_base_path.glob("behavior/*.json")))
+        # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
+        pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
+        matching_behavior_files = glob.glob(pattern)
+        if matching_behavior_files:
+            behavior_json = load_json_file(matching_behavior_files[0])
+        else:
+            logging.info("NO BEHAVIOR JSON")
         rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
         falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
 
@@ -413,7 +420,7 @@ def main():
         logging.info("No Fiber Data to QC")
         qc_file_path = results_folder / "no_fip_to_qc.txt"
         # Create an empty file
-        with open(qc_file_path, 'w') as file:
+        with open(qc_file_path, "w") as file:
             file.write("FIP data files are missing. This may be a behavior session.")
 
         print(f"Empty file created at: {qc_file_path}")
