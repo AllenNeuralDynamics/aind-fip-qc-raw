@@ -1,3 +1,5 @@
+import os
+import shutil
 import logging
 import csv
 import json
@@ -203,8 +205,10 @@ def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
     fiber_raw_path = fiber_base_path / "fib"
-    results_folder = Path("../results")
+    results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
+    qc_folder = Path("../results/aind-fip-qc-raw")
+    qc_folder.mkdir(parents=True, exist_ok=True)
     fiber_exists = True
 
     # Load JSON files
@@ -415,6 +419,16 @@ def main():
         # Create QC object and save
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
+
+        excluded_file = "quality_control.json"
+        # Iterate over files in the results directory
+        for filename in os.listdir(results_folder):
+            source_path = os.path.join(results_folder, filename)
+            destination_path = os.path.join(qc_folder, filename)
+
+            # Move everything except the excluded file
+            if filename != excluded_file:
+                shutil.move(source_path, destination_path)
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
