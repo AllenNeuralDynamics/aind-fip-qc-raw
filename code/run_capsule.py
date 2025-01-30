@@ -420,6 +420,11 @@ def main():
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
 
+        # We'd like to have our files organized such that QC is in the 
+        # results directory while plots are in a named folder.
+        # This allows the final results asset to have the same structure
+        # We need to generate QC in the parent to ensure it works with the 
+        # Web portal 
         excluded_file = "quality_control.json"
         # Iterate over files in the results directory
         for filename in os.listdir(results_folder):
