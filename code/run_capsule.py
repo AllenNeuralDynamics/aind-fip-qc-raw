@@ -427,7 +427,7 @@ def main():
             destination_path = os.path.join(qc_folder, filename)
 
             # Move everything except the excluded file
-            if filename != excluded_file:
+            if os.path.isfile(source_path) and filename != excluded_file:
                 shutil.move(source_path, destination_path)
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
