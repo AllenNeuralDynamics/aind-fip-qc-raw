@@ -288,7 +288,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        referenc=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     )
                 ],
             ),
@@ -304,7 +304,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     ),
                     QCMetric(
                         name="Session length >15min",
@@ -315,7 +315,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     ),
                 ],
             ),
@@ -331,7 +331,7 @@ def main():
                                 metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "SyncPulseDiff.png"),
+                        reference=str(qc_folder / "SyncPulseDiff.png"),
                     ),
                     QCMetric(
                         name="Data length same (Falling)",
@@ -342,7 +342,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "SyncPulseDiff.png"),
+                        reference=str(qc_folder / "SyncPulseDiff.png"),
                     ),
                 ],
                 allow_failed=True,
@@ -390,7 +390,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Iso channel",
@@ -400,7 +400,7 @@ def main():
                                 metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Red channel",
@@ -410,7 +410,7 @@ def main():
                                 metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                 ],
             ),
