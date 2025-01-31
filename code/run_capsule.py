@@ -1,3 +1,5 @@
+import os
+import shutil
 import logging
 import csv
 import json
@@ -203,8 +205,10 @@ def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
     fiber_raw_path = fiber_base_path / "fib"
-    results_folder = Path("../results")
+    results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
+    qc_folder = Path("../results/aind-fip-qc-raw")
+    qc_folder.mkdir(parents=True, exist_ok=True)
     fiber_exists = True
 
     # Load JSON files
@@ -284,7 +288,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        referenc=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     )
                 ],
             ),
@@ -300,7 +304,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     ),
                     QCMetric(
                         name="Session length >15min",
@@ -311,7 +315,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "raw_traces.png"),
+                        reference=str(qc_folder / "raw_traces.png"),
                     ),
                 ],
             ),
@@ -327,7 +331,7 @@ def main():
                                 metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "SyncPulseDiff.png"),
+                        reference=str(qc_folder / "SyncPulseDiff.png"),
                     ),
                     QCMetric(
                         name="Data length same (Falling)",
@@ -338,7 +342,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "SyncPulseDiff.png"),
+                        reference=str(qc_folder / "SyncPulseDiff.png"),
                     ),
                 ],
                 allow_failed=True,
@@ -386,7 +390,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Iso channel",
@@ -396,7 +400,7 @@ def main():
                                 metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Red channel",
@@ -406,7 +410,7 @@ def main():
                                 metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(results_folder / "CMOS_Floor.png"),
+                        reference=str(qc_folder / "CMOS_Floor.png"),
                     ),
                 ],
             ),
@@ -415,6 +419,21 @@ def main():
         # Create QC object and save
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
+
+        # We'd like to have our files organized such that QC is in the 
+        # results directory while plots are in a named folder.
+        # This allows the final results asset to have the same structure
+        # We need to generate QC in the parent to ensure it works with the 
+        # Web portal 
+        excluded_file = "quality_control.json"
+        # Iterate over files in the results directory
+        for filename in os.listdir(results_folder):
+            source_path = os.path.join(results_folder, filename)
+            destination_path = os.path.join(qc_folder, filename)
+
+            # Move everything except the excluded file
+            if os.path.isfile(source_path) and filename != excluded_file:
+                shutil.move(source_path, destination_path)
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
