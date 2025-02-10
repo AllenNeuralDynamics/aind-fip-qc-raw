@@ -207,7 +207,7 @@ def main():
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
-    qc_folder = Path("../results/aind-fip-qc-raw")
+    qc_folder = Path("../results/qc-raw")
     qc_folder.mkdir(parents=True, exist_ok=True)
 
     ref_folder = Path("qc-raw")
