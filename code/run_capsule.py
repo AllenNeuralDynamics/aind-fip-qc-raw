@@ -207,8 +207,10 @@ def main():
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
-    qc_folder = Path("aind-fip-qc-raw")
+    qc_folder = Path("../results/aind-fip-qc-raw")
     qc_folder.mkdir(parents=True, exist_ok=True)
+
+    ref_folder = Path("/aind-fip-qc-raw")
     fiber_exists = True
 
     # Load JSON files
@@ -288,7 +290,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(qc_folder / "raw_traces.png"),
+                        reference=str(ref_folder / "raw_traces.png"),
                     )
                 ],
             ),
