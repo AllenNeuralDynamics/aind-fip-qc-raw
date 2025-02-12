@@ -67,7 +67,7 @@ def generate_metrics(
     CMOSFloorDark_Green_Limit = 265
     CMOSFloorDark_Iso_Limit = 265
     CMOSFloorDark_Red_Limit = 265
-    sudden_change_limit = 5000
+    sudden_change_limit = 2000
     metrics = {
         "IsDataSizeSame": len(data1) == len(data2) == len(data3),
         "IsDataLongerThan15min": len(data1) > 18000,
@@ -407,6 +407,24 @@ def main():
                             )
                         ],
                         reference=str(ref_folder / "CMOS_Floor.png"),
+                    ),
+                ],
+            ),
+
+            create_evaluation(
+                "No sudden changes in signals",
+                "Pass when no sudden change in signal",
+                [
+                    QCMetric(
+                        name = "Max 1st derivative",
+                        value = float(np.max([np.max(np.diff(data1[10:-2, 1])), np.max(np.diff(data2[10:-2, 1])), np.max(np.diff(data3[10:-2, 1]))])),
+                        status_history=[
+                            Bool2Status(
+                                metrics["NoSuddenChangeInSignal"],
+                                t=datetime.now(seattle_tz),
+                            )
+                        ],
+                        reference=str(ref_folder / "raw_traces.png"),
                     ),
                 ],
             ),
