@@ -207,8 +207,10 @@ def main():
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
-    qc_folder = Path("../results/aind-fip-qc-raw")
+    qc_folder = Path("../results/qc-raw")
     qc_folder.mkdir(parents=True, exist_ok=True)
+
+    ref_folder = Path("qc-raw")
     fiber_exists = True
 
     # Load JSON files
@@ -288,23 +290,7 @@ def main():
                                 metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(qc_folder / "raw_traces.png"),
-                    )
-                ],
-            ),
-            create_evaluation(
-                "Data length check",
-                "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
-                [
-                    QCMetric(
-                        name="Data length same",
-                        value=len(data1),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(qc_folder / "raw_traces.png"),
+                        reference=str(ref_folder / "raw_traces.png"),
                     ),
                     QCMetric(
                         name="Session length >15min",
@@ -315,7 +301,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(qc_folder / "raw_traces.png"),
+                        reference=str(ref_folder / "raw_traces.png"),
                     ),
                 ],
             ),
@@ -331,7 +317,7 @@ def main():
                                 metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(qc_folder / "SyncPulseDiff.png"),
+                        reference=str(ref_folder / "SyncPulseDiff.png"),
                     ),
                     QCMetric(
                         name="Data length same (Falling)",
@@ -342,7 +328,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(qc_folder / "SyncPulseDiff.png"),
+                        reference=str(ref_folder / "SyncPulseDiff.png"),
                     ),
                 ],
                 allow_failed=True,
@@ -390,7 +376,7 @@ def main():
                                 t=datetime.now(seattle_tz),
                             )
                         ],
-                        reference=str(qc_folder / "CMOS_Floor.png"),
+                        reference=str(ref_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Iso channel",
@@ -400,7 +386,7 @@ def main():
                                 metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(qc_folder / "CMOS_Floor.png"),
+                        reference=str(ref_folder / "CMOS_Floor.png"),
                     ),
                     QCMetric(
                         name="Floor average signal in Red channel",
@@ -410,7 +396,7 @@ def main():
                                 metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
                             )
                         ],
-                        reference=str(qc_folder / "CMOS_Floor.png"),
+                        reference=str(ref_folder / "CMOS_Floor.png"),
                     ),
                 ],
             ),
