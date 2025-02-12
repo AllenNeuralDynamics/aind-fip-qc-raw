@@ -107,21 +107,21 @@ def create_evaluation(
     )
 
 
-def plot_cmos_trace_data(data_list, colors, results_folder):
+def plot_cmos_trace_data(data_list, colors, results_folder, ):
     """Plot raw frame and cmos data and save to a file."""
     data1 = data_list[0]
     data2 = data_list[1]
     plt.figure(figsize=(10, 20))
     for i_panel in range(4):
         plt.subplot(8, 1, i_panel + 1)
-        plt.plot(data1[:, i_panel + 1], color=colors[0])
+        plt.plot(data1[:, i_panel], color=colors[0])
         plt.title("GreenCh ROI:" + str(i_panel))
         if i_panel==0:
             plt.ylabel("CMOS pixel val")
 
     for i_panel in range(4):
         plt.subplot(8, 1, i_panel + 5)
-        plt.plot(data2[:, i_panel + 1], color=colors[1])
+        plt.plot(data2[:, i_panel], color=colors[1])
         plt.title("RedCh ROI:" + str(i_panel))
     plt.xlabel("frames")
 
@@ -224,6 +224,10 @@ def main():
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
     setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
+
+    session_data = load_json_file(fiber_base_path / "session.json")
+    rig_id = session_data.get("rig_id")
+    experimenter = session_data.get("experimenter_full_name")[0]
 
     # Assuming `fiber_raw_path` is defined earlier in the code
     fiber_channel_patterns = ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
