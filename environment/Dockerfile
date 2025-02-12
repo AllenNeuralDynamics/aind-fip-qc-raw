@@ -1,4 +1,4 @@
-# hash:sha256:37def1b4346705a0c346e477e271635a8dc15737835da5334ea4368668d3140a
+# hash:sha256:847aafaa6a984fdf96e32e16897ddfb124240ab8da59106b43a05af777e3f64c
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04
 
@@ -22,6 +22,21 @@ RUN pip install -U --no-cache-dir \
     matplotlib==3.7.5 \
     numpy==1.24.4 \
     pandas==2.0.3
+
+ADD "https://github.com/coder/code-server/releases/download/v4.95.3/code-server-4.95.3-linux-amd64.tar.gz" /.code-server/code-server.tar.gz
+	
+RUN cd /.code-server \
+    && tar -xvf code-server.tar.gz \
+    && rm code-server.tar.gz \
+    && ln -s /.code-server/code-server-4.95.3-linux-amd64/bin/code-server  /usr/bin/code-server
+
+RUN mkdir -p /.vscode/extensions \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension REditorSupport.R \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension continue.continue \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension ms-python.python \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension ms-toolsai.jupyter \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension reageyao.bioSyntax \
+    && code-server --extensions-dir="/.vscode/extensions" --install-extension saoudrizwan.claude-dev
 
 COPY postInstall /
 RUN /postInstall

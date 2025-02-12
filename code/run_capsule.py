@@ -111,20 +111,22 @@ def plot_cmos_trace_data(data_list, colors, results_folder):
     """Plot raw frame and cmos data and save to a file."""
     data1 = data_list[0]
     data2 = data_list[1]
-    plt.figure(figsize=(8, 4))
+    plt.figure(figsize=(10, 20))
     for i_panel in range(4):
         plt.subplot(8, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
         plt.title("GreenCh ROI:" + str(i_panel))
-        plt.xlabel("frames")
-        plt.ylabel("CMOS pixel val")
+        if i_panel==0:
+            plt.ylabel("CMOS pixel val")
 
     for i_panel in range(4):
         plt.subplot(8, 1, i_panel + 5)
         plt.plot(data2[:, i_panel + 1], color=colors[1])
         plt.title("RedCh ROI:" + str(i_panel))
-        plt.xlabel("frames")
-        plt.ylabel("CMOS pixel val")
+    plt.xlabel("frames")
+
+    plt.subplots_adjust(hspace=1.2)
+
     plt.savefig(f"{results_folder}/raw_traces.png")
     plt.savefig(f"{results_folder}/raw_traces.pdf")
     plt.show()
@@ -140,7 +142,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
         data3 (numpy.ndarray): Data for RedCh.
         results_folder (str): Path to save the output plots.
     """
-    plt.figure(figsize=(8, 2))
+    plt.figure(figsize=(8, 4))
 
     # GreenCh Floor
     plt.subplot(1, 3, 1)
