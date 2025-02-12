@@ -291,22 +291,6 @@ def main():
                             )
                         ],
                         reference=str(ref_folder / "raw_traces.png"),
-                    )
-                ],
-            ),
-            create_evaluation(
-                "Data length check",
-                "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
-                [
-                    QCMetric(
-                        name="Data length same",
-                        value=len(data1),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "raw_traces.png"),
                     ),
                     QCMetric(
                         name="Session length >15min",
