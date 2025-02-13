@@ -115,8 +115,15 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
     for i_panel in range(4):
         plt.subplot(8, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
-        if i_panel==0:
-            plt.title("GreenCh ROI:" + str(i_panel) + " rig: " + rig_id + " by: " + experimenter)
+        if i_panel == 0:
+            plt.title(
+                "GreenCh ROI:"
+                + str(i_panel)
+                + " rig: "
+                + rig_id
+                + " by: "
+                + experimenter
+            )
             plt.ylabel("CMOS pixel val")
         else:
             plt.title("GreenCh ROI:" + str(i_panel))
@@ -279,8 +286,8 @@ def main():
             data_list=[data1, data2],
             colors=["darkgreen", "magenta"],
             results_folder=results_folder,
-            rig_id = rig_id,
-            experimenter = experimenter
+            rig_id=rig_id,
+            experimenter=experimenter,
         )
         plot_sensor_floor(data1, data2, data3, results_folder)
         plot_sync_pulse_diff(rising_time, results_folder)
@@ -410,14 +417,21 @@ def main():
                     ),
                 ],
             ),
-
             create_evaluation(
                 "No sudden changes in signals",
                 "Pass when no sudden change in signal",
                 [
                     QCMetric(
-                        name = "Max 1st derivative",
-                        value = float(np.max([np.max(np.diff(data1[10:-2, 1])), np.max(np.diff(data2[10:-2, 1])), np.max(np.diff(data3[10:-2, 1]))])),
+                        name="Max 1st derivative",
+                        value=float(
+                            np.max(
+                                [
+                                    np.max(np.diff(data1[10:-2, 1])),
+                                    np.max(np.diff(data2[10:-2, 1])),
+                                    np.max(np.diff(data3[10:-2, 1])),
+                                ]
+                            )
+                        ),
                         status_history=[
                             Bool2Status(
                                 metrics["NoSuddenChangeInSignal"],
@@ -434,11 +448,11 @@ def main():
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
 
-        # We'd like to have our files organized such that QC is in the 
+        # We'd like to have our files organized such that QC is in the
         # results directory while plots are in a named folder.
         # This allows the final results asset to have the same structure
-        # We need to generate QC in the parent to ensure it works with the 
-        # Web portal 
+        # We need to generate QC in the parent to ensure it works with the
+        # Web portal
         excluded_file = "quality_control.json"
         # Iterate over files in the results directory
         for filename in os.listdir(results_folder):
