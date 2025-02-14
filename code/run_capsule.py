@@ -48,8 +48,22 @@ def load_csv_data(file_path):
         with open(file_path) as f:
             reader = csv.reader(f)
             return np.array([row for row in reader], dtype=np.float32)
+
     except FileNotFoundError:
         logging.error(f"Error: {file_path} not found.")
+
+    except ValueError:
+        with open(file_path) as f:
+            reader = csv.reader(f)
+            rows = [row for row in reader]
+    
+        max_cols = max(len(row) for row in rows)
+        if len(rows[-1]) < max_cols:    #eliminating the broken last row
+            rows.pop()
+        return np.array(rows, dtype=np.float32)
+
+        logging.error(f"Error: {file_path} csv file is found but broken.")
+        logging.info("The last row of the data with imperfect column numbers were eliminated")
 
 
 def generate_metrics(
