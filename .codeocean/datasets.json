@@ -2,8 +2,16 @@
 	"version": 1,
 	"attached_datasets": [
 		{
+			"id": "013adcda-d8af-486b-8113-7650b500de91",
+			"mount": "behavior_764702_2025-02-11_12-13-17"
+		},
+		{
 			"id": "13325359-2733-4914-9dcd-90379ebe355a",
 			"mount": "fiber_raw_data"
+		},
+		{
+			"id": "b7798eba-de72-4cf4-9d7a-ae5f2e10b9ec",
+			"mount": "behavior_756403_2025-02-13_09-09-21"
 		}
 	]
 }

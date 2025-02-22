@@ -67,6 +67,7 @@ def load_csv_data(file_path):
 
 
 def generate_metrics(
+    data_lists,
     data1,
     data2,
     data3,
@@ -98,6 +99,7 @@ def generate_metrics(
             np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
             for data in [data1, data2, data3]
         ),
+        "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
     }
     return metrics
 
@@ -229,6 +231,7 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
+    fiber_base_path = Path("/data/behavior_764702_2025-02-11_12-13-17")
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
@@ -257,7 +260,7 @@ def main():
 
     # Use a list comprehension to find matching files
     channel_file_paths = [
-        next(fiber_raw_path.glob(fiber_channel), None)  # Default to None if no match
+        sorted(fiber_raw_path.glob(fiber_channel))  #sorted based on DAQ time
         for fiber_channel in fiber_channel_patterns
     ]
 
@@ -265,7 +268,15 @@ def main():
     fiber_exists = all(channel_file_paths)
 
     if fiber_exists:
-        data1, data2, data3 = [load_csv_data(file) for file in channel_file_paths]
+        data_lists = [[load_csv_data(file) for file in file_list] for file_list in channel_file_paths]
+        data1_list, data2_list, data3_list = data_lists #keep all csv files
+
+        if len(data_lists[0]) > 1:
+            logging.error("Multiple recording files found in this session. Only the largest file was used for QC.")
+
+        data1 = max(data1_list, key=lambda x: x.shape[0]) #using only the longest file for each ch
+        data2 = max(data2_list, key=lambda x: x.shape[0])
+        data3 = max(data3_list, key=lambda x: x.shape[0])
 
         # Load behavior JSON
         # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
@@ -285,6 +296,7 @@ def main():
 
         # Generate metrics
         metrics = generate_metrics(
+            data_lists,
             data1,
             data2,
             data3,
@@ -453,6 +465,22 @@ def main():
                             )
                         ],
                         reference=str(ref_folder / "raw_traces.png"),
+                    ),
+                ],
+            ),
+            create_evaluation(
+                "Single data file per channel in the session",
+                "Pass when the session folder has only one data per channel",
+                [
+                    QCMetric(
+                        name="Number of data files per channel",
+                        value=len(data_lists[0]),
+                        status_history=[
+                            Bool2Status(
+                                metrics["IsSingleRecordingPerSession"],
+                                t=datetime.now(seattle_tz),
+                            )
+                        ],
                     ),
                 ],
             ),
