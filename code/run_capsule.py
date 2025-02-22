@@ -231,7 +231,6 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
-    fiber_base_path = Path("/data/behavior_764702_2025-02-11_12-13-17")
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
