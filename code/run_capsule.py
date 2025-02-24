@@ -473,7 +473,7 @@ def main():
                 [
                     QCMetric(
                         name="Number of data files per channel",
-                        description="When FIP-Bonsai workflow starts/stops multiple times, it would generate multiple CSVs, RawMovie files, etc"
+                        description="When FIP-Bonsai workflow starts/stops multiple times, it would generate multiple CSVs, RawMovie files, etc",
                         value=len(data_lists[0]),
                         status_history=[
                             Bool2Status(
