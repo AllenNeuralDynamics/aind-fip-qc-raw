@@ -234,10 +234,10 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
     plt.show()
 
-
 def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
+
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
@@ -284,233 +284,246 @@ def main():
         data2 = max(data2_list, key=lambda x: x.shape[0])
         data3 = max(data3_list, key=lambda x: x.shape[0])
 
-        # Load behavior JSON
-        # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
-        pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
-        matching_behavior_files = glob.glob(pattern)
-        if matching_behavior_files:
-            behavior_json = load_json_file(matching_behavior_files[0])
-        else:
-            logging.info("NO BEHAVIOR JSON")
-        rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
-        falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
+        if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
 
-        # Calculate floor averages
-        green_floor_ave = np.mean(data1[:, -1])
-        iso_floor_ave = np.mean(data2[:, -1])
-        red_floor_ave = np.mean(data3[:, -1])
+            # Load behavior JSON
+            # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
+            pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
+            matching_behavior_files = glob.glob(pattern)
+            if matching_behavior_files:
+                behavior_json = load_json_file(matching_behavior_files[0])
+            else:
+                logging.info("NO BEHAVIOR JSON")
+            rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
+            falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
 
-        # Generate metrics
-        metrics = generate_metrics(
-            data_lists,
-            data1,
-            data2,
-            data3,
-            rising_time,
-            falling_time,
-            green_floor_ave,
-            iso_floor_ave,
-            red_floor_ave,
-        )
+            # Calculate floor averages
+            green_floor_ave = np.mean(data1[:, -1])
+            iso_floor_ave = np.mean(data2[:, -1])
+            red_floor_ave = np.mean(data3[:, -1])
 
-        # Plot data
-        plot_cmos_trace_data(
-            data_list=[data1, data2],
-            colors=["darkgreen", "magenta"],
-            results_folder=results_folder,
-            rig_id=rig_id,
-            experimenter=experimenter,
-        )
-        plot_sensor_floor(data1, data2, data3, results_folder)
-        plot_sync_pulse_diff(rising_time, results_folder)
+            # Generate metrics
+            metrics = generate_metrics(
+                data_lists,
+                data1,
+                data2,
+                data3,
+                rising_time,
+                falling_time,
+                green_floor_ave,
+                iso_floor_ave,
+                red_floor_ave,
+            )
 
-        # Create evaluations with our timezone
-        seattle_tz = pytz.timezone("America/Los_Angeles")
-        evaluations = [
-            create_evaluation(
-                "Data length check",
-                "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
-                [
-                    QCMetric(
-                        name="Data length same",
-                        value=len(data1),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "raw_traces.png"),
-                    ),
-                    QCMetric(
-                        name="Session length >15min",
-                        value=len(data1) / 20 / 60,
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsDataLongerThan15min"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                        reference=str(ref_folder / "raw_traces.png"),
-                    ),
-                ],
-            ),
-            create_evaluation(
-                "Complete Synchronization Pulse",
-                "Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
-                [
-                    QCMetric(
-                        name="Data length same (Rising)",
-                        value=len(rising_time),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "SyncPulseDiff.png"),
-                    ),
-                    QCMetric(
-                        name="Data length same (Falling)",
-                        value=len(falling_time),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsSyncPulseSameAsData"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                        reference=str(ref_folder / "SyncPulseDiff.png"),
-                    ),
-                ],
-                allow_failed=True,
-            ),
-            create_evaluation(
-                "No NaN values in data",
-                "Pass when no NaN values in the data",
-                [
-                    QCMetric(
-                        name="No NaN in Green channel",
-                        value=float(np.sum(np.isnan(data1))),
-                        status_history=[
-                            Bool2Status(
-                                metrics["NoGreenNan"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                    ),
-                    QCMetric(
-                        name="No NaN in Iso channel",
-                        value=float(np.sum(np.isnan(data2))),
-                        status_history=[
-                            Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
-                        ],
-                    ),
-                    QCMetric(
-                        name="No NaN in Red channel",
-                        value=float(np.sum(np.isnan(data3))),
-                        status_history=[
-                            Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
-                        ],
-                    ),
-                ],
-                allow_failed=False,
-            ),
-            create_evaluation(
-                "CMOS Floor signal",
-                "Pass when CMOS dark floor is <265 in all channel",
-                [
-                    QCMetric(
-                        name="Floor average signal in Green channel",
-                        value=float(green_floor_ave),
-                        status_history=[
-                            Bool2Status(
-                                metrics["CMOSFloorDark_Green"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                        reference=str(ref_folder / "CMOS_Floor.png"),
-                    ),
-                    QCMetric(
-                        name="Floor average signal in Iso channel",
-                        value=float(iso_floor_ave),
-                        status_history=[
-                            Bool2Status(
-                                metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "CMOS_Floor.png"),
-                    ),
-                    QCMetric(
-                        name="Floor average signal in Red channel",
-                        value=float(red_floor_ave),
-                        status_history=[
-                            Bool2Status(
-                                metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "CMOS_Floor.png"),
-                    ),
-                ],
-            ),
-            create_evaluation(
-                "No sudden changes in signals",
-                "Pass when no sudden change in signal",
-                [
-                    QCMetric(
-                        name="Max 1st derivative",
-                        value=float(
-                            np.max(
-                                [
-                                    np.max(np.diff(data1[10:-2, 1])),
-                                    np.max(np.diff(data2[10:-2, 1])),
-                                    np.max(np.diff(data3[10:-2, 1])),
-                                ]
-                            )
+            # Plot data
+            plot_cmos_trace_data(
+                data_list=[data1, data2],
+                colors=["darkgreen", "magenta"],
+                results_folder=results_folder,
+                rig_id=rig_id,
+                experimenter=experimenter,
+            )
+            plot_sensor_floor(data1, data2, data3, results_folder)
+            plot_sync_pulse_diff(rising_time, results_folder)
+
+            # Create evaluations with our timezone
+            seattle_tz = pytz.timezone("America/Los_Angeles")
+            evaluations = [
+                create_evaluation(
+                    "Data length check",
+                    "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
+                    [
+                        QCMetric(
+                            name="Data length same",
+                            value=len(data1),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
+                                )
+                            ],
+                            reference=str(ref_folder / "raw_traces.png"),
                         ),
-                        status_history=[
-                            Bool2Status(
-                                metrics["NoSuddenChangeInSignal"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                        reference=str(ref_folder / "raw_traces.png"),
-                    ),
-                ],
-            ),
-            create_evaluation(
-                "Single data file per channel in the session",
-                "Pass when the session folder has only one data per channel",
-                [
-                    QCMetric(
-                        name="Number of data files per channel",
-                        description="When FIP-Bonsai workflow starts/stops multiple times, it would generate multiple CSVs, RawMovie files, etc",
-                        value=len(data_lists[0]),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsSingleRecordingPerSession"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                    ),
-                ],
-            ),
-        ]
+                        QCMetric(
+                            name="Session length >15min",
+                            value=len(data1) / 20 / 60,
+                            status_history=[
+                                Bool2Status(
+                                    metrics["IsDataLongerThan15min"],
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                            reference=str(ref_folder / "raw_traces.png"),
+                        ),
+                    ],
+                ),
+                create_evaluation(
+                    "Complete Synchronization Pulse",
+                    "Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
+                    [
+                        QCMetric(
+                            name="Data length same (Rising)",
+                            value=len(rising_time),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
+                                )
+                            ],
+                            reference=str(ref_folder / "SyncPulseDiff.png"),
+                        ),
+                        QCMetric(
+                            name="Data length same (Falling)",
+                            value=len(falling_time),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["IsSyncPulseSameAsData"],
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                            reference=str(ref_folder / "SyncPulseDiff.png"),
+                        ),
+                    ],
+                    allow_failed=True,
+                ),
+                create_evaluation(
+                    "No NaN values in data",
+                    "Pass when no NaN values in the data",
+                    [
+                        QCMetric(
+                            name="No NaN in Green channel",
+                            value=float(np.sum(np.isnan(data1))),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["NoGreenNan"], t=datetime.now(seattle_tz)
+                                )
+                            ],
+                        ),
+                        QCMetric(
+                            name="No NaN in Iso channel",
+                            value=float(np.sum(np.isnan(data2))),
+                            status_history=[
+                                Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
+                            ],
+                        ),
+                        QCMetric(
+                            name="No NaN in Red channel",
+                            value=float(np.sum(np.isnan(data3))),
+                            status_history=[
+                                Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
+                            ],
+                        ),
+                    ],
+                    allow_failed=False,
+                ),
+                create_evaluation(
+                    "CMOS Floor signal",
+                    "Pass when CMOS dark floor is <265 in all channel",
+                    [
+                        QCMetric(
+                            name="Floor average signal in Green channel",
+                            value=float(green_floor_ave),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["CMOSFloorDark_Green"],
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                            reference=str(ref_folder / "CMOS_Floor.png"),
+                        ),
+                        QCMetric(
+                            name="Floor average signal in Iso channel",
+                            value=float(iso_floor_ave),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
+                                )
+                            ],
+                            reference=str(ref_folder / "CMOS_Floor.png"),
+                        ),
+                        QCMetric(
+                            name="Floor average signal in Red channel",
+                            value=float(red_floor_ave),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
+                                )
+                            ],
+                            reference=str(ref_folder / "CMOS_Floor.png"),
+                        ),
+                    ],
+                ),
+                create_evaluation(
+                    "No sudden changes in signals",
+                    "Pass when no sudden change in signal",
+                    [
+                        QCMetric(
+                            name="Max 1st derivative",
+                            value=float(
+                                np.max(
+                                    [
+                                        np.max(np.diff(data1[10:-2, 1])),
+                                        np.max(np.diff(data2[10:-2, 1])),
+                                        np.max(np.diff(data3[10:-2, 1])),
+                                    ]
+                                )
+                            ),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["NoSuddenChangeInSignal"],
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                            reference=str(ref_folder / "raw_traces.png"),
+                        ),
+                    ],
+                ),
+                create_evaluation(
+                    "Single data file per channel in the session",
+                    "Pass when the session folder has only one data per channel",
+                    [
+                        QCMetric(
+                            name="Number of data files per channel",
+                            description="When FIP-Bonsai workflow starts/stops multiple times, it would generate multiple CSVs, RawMovie files, etc",
+                            value=len(data_lists[0]),
+                            status_history=[
+                                Bool2Status(
+                                    metrics["IsSingleRecordingPerSession"],
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                        ),
+                    ],
+                ),
+            ]
 
-        # Create QC object and save
-        qc = QualityControl(evaluations=evaluations)
-        qc.write_standard_file(output_directory=str(results_folder))
+            # Create QC object and save
+            qc = QualityControl(evaluations=evaluations)
+            qc.write_standard_file(output_directory=str(results_folder))
 
-        # We'd like to have our files organized such that QC is in the
-        # results directory while plots are in a named folder.
-        # This allows the final results asset to have the same structure
-        # We need to generate QC in the parent to ensure it works with the
-        # Web portal
-        excluded_file = "quality_control.json"
-        # Iterate over files in the results directory
-        for filename in os.listdir(results_folder):
-            source_path = os.path.join(results_folder, filename)
-            destination_path = os.path.join(qc_folder, filename)
+            # We'd like to have our files organized such that QC is in the
+            # results directory while plots are in a named folder.
+            # This allows the final results asset to have the same structure
+            # We need to generate QC in the parent to ensure it works with the
+            # Web portal
+            excluded_file = "quality_control.json"
+            # Iterate over files in the results directory
+            for filename in os.listdir(results_folder):
+                source_path = os.path.join(results_folder, filename)
+                destination_path = os.path.join(qc_folder, filename)
 
-            # Move everything except the excluded file
-            if os.path.isfile(source_path) and filename != excluded_file:
-                shutil.move(source_path, destination_path)
+                # Move everything except the excluded file
+                if os.path.isfile(source_path) and filename != excluded_file:
+                    shutil.move(source_path, destination_path)
+        
+        else:
+            logging.error("FIP data files are there but at least one ch is empty")
+            logging.info("No Fiber Data to QC")
+            qc_file_path = results_folder / "no_fip_to_qc.txt"
+            # Create an empty file
+            with open(qc_file_path, "w") as file:
+                file.write("FIP data files are missing. This may be a behavior session.")
+
+            print(f"Empty file created at: {qc_file_path}")
+            
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
