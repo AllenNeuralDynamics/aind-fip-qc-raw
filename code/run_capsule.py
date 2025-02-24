@@ -45,9 +45,16 @@ def load_json_file(file_path):
 def load_csv_data(file_path):
     """Load CSV data into a NumPy array."""
     try:
+        rows = []
         with open(file_path) as f:
             reader = csv.reader(f)
-            return np.array([row for row in reader], dtype=np.float32)
+            for row in reader:
+                for i, cell in enumerate(row):
+                    if cell == "" and i > 0:
+                        row[i] = row[i-1]
+                        logging.error(f"Error: {file_path} csv file is found but broken -- contains empty string.")
+                rows.append(row)
+        return np.array(rows, dtype=np.float32)
 
     except FileNotFoundError:
         logging.error(f"Error: {file_path} not found.")
