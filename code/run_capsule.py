@@ -365,7 +365,7 @@ def main():
             evaluations = [
                 create_evaluation(
                     "Data length check",
-                    "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
+                    "Pass when data_length for Green/Iso/Red are same and the session is >15min",
                     [
                         QCMetric(
                             name="Data length same",
