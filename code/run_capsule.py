@@ -286,16 +286,20 @@ def main():
 
         if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
 
-            # Load behavior JSON
+            # Load behavior JSON (dynamic foraging specific)
             # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
             pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
             matching_behavior_files = glob.glob(pattern)
             if matching_behavior_files:
                 behavior_json = load_json_file(matching_behavior_files[0])
+                rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
+                falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
             else:
-                logging.info("NO BEHAVIOR JSON")
-            rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
-            falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
+                logging.info("NO BEHAVIOR JSON — Non-dynamicforaging or simply missing")
+                # preparing fake syncpulses
+                rising_time = list(range(0, len(data1), 50))
+                falling_time = list(range(0, len(data1), 50))
+
 
             # Calculate floor averages
             green_floor_ave = np.mean(data1[:, -1])
