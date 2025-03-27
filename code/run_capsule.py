@@ -245,11 +245,19 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     diffs = np.diff(rising_time)
 
     # Create the plot
-    plt.figure(figsize=(2, 2))
+    plt.figure(figsize=(4, 2))
+    plt.subplot(1, 2, 1)
     plt.hist(diffs, bins=100, range=(0, 0.2))
     plt.title("sync pulse diff")
     plt.ylabel("counts")
     plt.xlabel("ms")
+
+    plt.subplot(1, 2, 2)
+    plt.hist(diffs, bins=1000)
+    plt.title("sync pulse diff - all")
+    plt.ylabel("counts")
+    plt.xlabel("ms")
+    plt.subplots_adjust(wspace=0.8)
 
     # Save and show the plot
     plt.savefig(f"{results_folder}/SyncPulseDiff.png", dpi=300, bbox_inches="tight")
