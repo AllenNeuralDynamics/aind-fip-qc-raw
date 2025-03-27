@@ -174,10 +174,10 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
         data3 (numpy.ndarray): Data for RedCh.
         results_folder (str): Path to save the output plots.
     """
-    plt.figure(figsize=(8, 2))
+    plt.figure(figsize=(8, 4))
 
     # GreenCh Floor
-    plt.subplot(1, 3, 1)
+    plt.subplot(2, 3, 1)
     plt.hist(data1[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
     plt.xlim(255, 270)
     GreenChFloorAve = np.mean(data1[:, -1])
@@ -185,8 +185,15 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
+    plt.subplot(2, 3, 4)
+    plt.hist(data1[:, -1], bins=1000, color="green", alpha=0.7)
+    GreenChFloorAve = np.mean(data1[:, -1])
+    plt.title(f"GreenFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
     # IsoCh Floor
-    plt.subplot(1, 3, 2)
+    plt.subplot(2, 3, 2)
     plt.hist(data2[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
     plt.xlim(255, 270)
     IsoChFloorAve = np.mean(data2[:, -1])
@@ -194,16 +201,31 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
-    # RedCh Floor
-    plt.subplot(1, 3, 3)
-    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
+    plt.subplot(2, 3, 5)
+    plt.hist(data2[:, -1], bins=1000, color="purple", alpha=0.7)
     plt.xlim(255, 270)
+    IsoChFloorAve = np.mean(data2[:, -1])
+    plt.title(f"IsoFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
+    # RedCh Floor
+    plt.subplot(2, 3, 3)
+    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
     RedChFloorAve = np.mean(data3[:, -1])
     plt.title(f"RedCh FloorAve: {RedChFloorAve:.2f}")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
+    plt.subplot(2, 3, 6)
+    plt.hist(data3[:, -1], bins=1000, color="red", alpha=0.7)
+    RedChFloorAve = np.mean(data3[:, -1])
+    plt.title(f"RedFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
     plt.subplots_adjust(wspace=0.8)
+    plt.subplots_adjust(hspace=0.8)
 
     # Save and show the plot
     plt.savefig(f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight")
