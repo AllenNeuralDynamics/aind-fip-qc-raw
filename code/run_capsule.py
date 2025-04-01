@@ -174,10 +174,10 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
         data3 (numpy.ndarray): Data for RedCh.
         results_folder (str): Path to save the output plots.
     """
-    plt.figure(figsize=(8, 2))
+    plt.figure(figsize=(8, 4))
 
     # GreenCh Floor
-    plt.subplot(1, 3, 1)
+    plt.subplot(2, 3, 1)
     plt.hist(data1[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
     plt.xlim(255, 270)
     GreenChFloorAve = np.mean(data1[:, -1])
@@ -185,8 +185,15 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
+    plt.subplot(2, 3, 4)
+    plt.hist(data1[:, -1], bins=1000, color="green", alpha=0.7)
+    GreenChFloorAve = np.mean(data1[:, -1])
+    plt.title(f"GreenFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
     # IsoCh Floor
-    plt.subplot(1, 3, 2)
+    plt.subplot(2, 3, 2)
     plt.hist(data2[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
     plt.xlim(255, 270)
     IsoChFloorAve = np.mean(data2[:, -1])
@@ -194,16 +201,31 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
-    # RedCh Floor
-    plt.subplot(1, 3, 3)
-    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
+    plt.subplot(2, 3, 5)
+    plt.hist(data2[:, -1], bins=1000, color="purple", alpha=0.7)
     plt.xlim(255, 270)
+    IsoChFloorAve = np.mean(data2[:, -1])
+    plt.title(f"IsoFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
+    # RedCh Floor
+    plt.subplot(2, 3, 3)
+    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
     RedChFloorAve = np.mean(data3[:, -1])
     plt.title(f"RedCh FloorAve: {RedChFloorAve:.2f}")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
+    plt.subplot(2, 3, 6)
+    plt.hist(data3[:, -1], bins=1000, color="red", alpha=0.7)
+    RedChFloorAve = np.mean(data3[:, -1])
+    plt.title(f"RedFloor - All data")
+    plt.xlabel("CMOS pixel val")
+    plt.ylabel("counts")
+
     plt.subplots_adjust(wspace=0.8)
+    plt.subplots_adjust(hspace=0.8)
 
     # Save and show the plot
     plt.savefig(f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight")
@@ -223,11 +245,19 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     diffs = np.diff(rising_time)
 
     # Create the plot
-    plt.figure(figsize=(2, 2))
+    plt.figure(figsize=(4, 2))
+    plt.subplot(1, 2, 1)
     plt.hist(diffs, bins=100, range=(0, 0.2))
     plt.title("sync pulse diff")
     plt.ylabel("counts")
     plt.xlabel("ms")
+
+    plt.subplot(1, 2, 2)
+    plt.hist(diffs, bins=1000)
+    plt.title("sync pulse diff - all")
+    plt.ylabel("counts")
+    plt.xlabel("ms")
+    plt.subplots_adjust(wspace=0.8)
 
     # Save and show the plot
     plt.savefig(f"{results_folder}/SyncPulseDiff.png", dpi=300, bbox_inches="tight")
@@ -286,16 +316,20 @@ def main():
 
         if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
 
-            # Load behavior JSON
+            # Load behavior JSON (dynamic foraging specific)
             # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
             pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
             matching_behavior_files = glob.glob(pattern)
             if matching_behavior_files:
                 behavior_json = load_json_file(matching_behavior_files[0])
+                rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
+                falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
             else:
-                logging.info("NO BEHAVIOR JSON")
-            rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
-            falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
+                logging.info("NO BEHAVIOR JSON — Non-dynamicforaging or simply missing")
+                # preparing fake syncpulses
+                rising_time = list(range(0, len(data1), 50))
+                falling_time = list(range(0, len(data1), 50))
+
 
             # Calculate floor averages
             green_floor_ave = np.mean(data1[:, -1])
@@ -331,7 +365,7 @@ def main():
             evaluations = [
                 create_evaluation(
                     "Data length check",
-                    "Pass when GreenCh_data_length==IsoCh_data_length and the session is >15min",
+                    "Pass when data_length for Green/Iso/Red are same and the session is >15min",
                     [
                         QCMetric(
                             name="Data length same",
