@@ -392,10 +392,10 @@ def main():
                 ),
                 create_evaluation(
                     "Complete Synchronization Pulse",
-                    "Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
+                    "Pass when 1)rising and falling give the same length; 2)sync Pulse number equals data length",
                     [
                         QCMetric(
-                            name="Data length same (Rising)",
+                            name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
                             value=len(rising_time),
                             status_history=[
                                 Bool2Status(
@@ -405,7 +405,7 @@ def main():
                             reference=str(ref_folder / "SyncPulseDiff.png"),
                         ),
                         QCMetric(
-                            name="Data length same (Falling)",
+                            name="Data length same as one of data length (Value: Falling edge of synch pulse)",
                             value=len(falling_time),
                             status_history=[
                                 Bool2Status(
