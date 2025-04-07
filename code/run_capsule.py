@@ -351,7 +351,7 @@ def main():
 
             # Plot data
             plot_cmos_trace_data(
-                data_list=[data1, data2],
+                data_list=[data1, data3],
                 colors=["darkgreen", "magenta"],
                 results_folder=results_folder,
                 rig_id=rig_id,
