@@ -135,7 +135,7 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
     data1 = data_list[0]
     data2 = data_list[1]
     data3 = data_list[2]
-    plt.figure(figsize=(15, 16))
+    plt.figure(figsize=(16, 20))
     for i_panel in range(4):
         plt.subplot(12, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
@@ -156,13 +156,12 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
         plt.subplot(12, 1, i_panel + 5)
         plt.plot(data2[:, i_panel + 1], color=colors[1])
         plt.title("Iso ROI:" + str(i_panel))
-    plt.xlabel("frames")
 
     for i_panel in range(4):
         plt.subplot(12, 1, i_panel + 9)
         plt.plot(data3[:, i_panel + 1], color=colors[2])
         plt.title("RedCh ROI:" + str(i_panel))
-    plt.xlabel("frames")
+    plt.xlabel("frames (20Hz)")
 
     plt.subplots_adjust(hspace=1.2)
 
