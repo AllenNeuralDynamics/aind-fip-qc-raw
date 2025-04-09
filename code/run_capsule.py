@@ -134,9 +134,10 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
     """Plot raw frame and cmos data and save to a file."""
     data1 = data_list[0]
     data2 = data_list[1]
-    plt.figure(figsize=(10, 16))
+    data3 = data_list[2]
+    plt.figure(figsize=(15, 16))
     for i_panel in range(4):
-        plt.subplot(8, 1, i_panel + 1)
+        plt.subplot(12, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
         if i_panel == 0:
             plt.title(
@@ -152,8 +153,14 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
             plt.title("GreenCh ROI:" + str(i_panel))
 
     for i_panel in range(4):
-        plt.subplot(8, 1, i_panel + 5)
+        plt.subplot(12, 1, i_panel + 5)
         plt.plot(data2[:, i_panel + 1], color=colors[1])
+        plt.title("Iso ROI:" + str(i_panel))
+    plt.xlabel("frames")
+
+    for i_panel in range(4):
+        plt.subplot(12, 1, i_panel + 9)
+        plt.plot(data3[:, i_panel + 1], color=colors[2])
         plt.title("RedCh ROI:" + str(i_panel))
     plt.xlabel("frames")
 
@@ -350,8 +357,8 @@ def main():
 
             # Plot data
             plot_cmos_trace_data(
-                data_list=[data1, data2],
-                colors=["darkgreen", "magenta"],
+                data_list=[data1, data2, data3],
+                colors=["darkgreen", "purple", "magenta"],
                 results_folder=results_folder,
                 rig_id=rig_id,
                 experimenter=experimenter,
