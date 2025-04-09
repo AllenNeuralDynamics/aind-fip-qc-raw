@@ -186,7 +186,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 4)
-    plt.hist(data1[:, -1], bins=1000, color="green", alpha=0.7)
+    plt.hist(data1[:, -1], bins=100, color="green", alpha=0.7)
     GreenChFloorAve = np.mean(data1[:, -1])
     plt.title(f"GreenFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -202,8 +202,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 5)
-    plt.hist(data2[:, -1], bins=1000, color="purple", alpha=0.7)
-    plt.xlim(255, 270)
+    plt.hist(data2[:, -1], bins=100, color="purple", alpha=0.7)
     IsoChFloorAve = np.mean(data2[:, -1])
     plt.title(f"IsoFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -218,7 +217,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 6)
-    plt.hist(data3[:, -1], bins=1000, color="red", alpha=0.7)
+    plt.hist(data3[:, -1], bins=100, color="red", alpha=0.7)
     RedChFloorAve = np.mean(data3[:, -1])
     plt.title(f"RedFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -253,7 +252,7 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     plt.xlabel("ms")
 
     plt.subplot(1, 2, 2)
-    plt.hist(diffs, bins=1000)
+    plt.hist(diffs, bins=100)
     plt.title("sync pulse diff - all")
     plt.ylabel("counts")
     plt.xlabel("ms")
