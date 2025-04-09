@@ -134,9 +134,10 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
     """Plot raw frame and cmos data and save to a file."""
     data1 = data_list[0]
     data2 = data_list[1]
-    plt.figure(figsize=(10, 16))
+    data3 = data_list[2]
+    plt.figure(figsize=(16, 20))
     for i_panel in range(4):
-        plt.subplot(8, 1, i_panel + 1)
+        plt.subplot(12, 1, i_panel + 1)
         plt.plot(data1[:, i_panel + 1], color=colors[0])
         if i_panel == 0:
             plt.title(
@@ -152,10 +153,15 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
             plt.title("GreenCh ROI:" + str(i_panel))
 
     for i_panel in range(4):
-        plt.subplot(8, 1, i_panel + 5)
+        plt.subplot(12, 1, i_panel + 5)
         plt.plot(data2[:, i_panel + 1], color=colors[1])
+        plt.title("Iso ROI:" + str(i_panel))
+
+    for i_panel in range(4):
+        plt.subplot(12, 1, i_panel + 9)
+        plt.plot(data3[:, i_panel + 1], color=colors[2])
         plt.title("RedCh ROI:" + str(i_panel))
-    plt.xlabel("frames")
+    plt.xlabel("frames (20Hz)")
 
     plt.subplots_adjust(hspace=1.2)
 
@@ -186,7 +192,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 4)
-    plt.hist(data1[:, -1], bins=1000, color="green", alpha=0.7)
+    plt.hist(data1[:, -1], bins=100, color="green", alpha=0.7)
     GreenChFloorAve = np.mean(data1[:, -1])
     plt.title(f"GreenFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -202,8 +208,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 5)
-    plt.hist(data2[:, -1], bins=1000, color="purple", alpha=0.7)
-    plt.xlim(255, 270)
+    plt.hist(data2[:, -1], bins=100, color="purple", alpha=0.7)
     IsoChFloorAve = np.mean(data2[:, -1])
     plt.title(f"IsoFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -218,7 +223,7 @@ def plot_sensor_floor(data1, data2, data3, results_folder):
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 6)
-    plt.hist(data3[:, -1], bins=1000, color="red", alpha=0.7)
+    plt.hist(data3[:, -1], bins=100, color="red", alpha=0.7)
     RedChFloorAve = np.mean(data3[:, -1])
     plt.title(f"RedFloor - All data")
     plt.xlabel("CMOS pixel val")
@@ -253,7 +258,7 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     plt.xlabel("ms")
 
     plt.subplot(1, 2, 2)
-    plt.hist(diffs, bins=1000)
+    plt.hist(diffs, bins=100)
     plt.title("sync pulse diff - all")
     plt.ylabel("counts")
     plt.xlabel("ms")
@@ -351,8 +356,8 @@ def main():
 
             # Plot data
             plot_cmos_trace_data(
-                data_list=[data1, data2],
-                colors=["darkgreen", "magenta"],
+                data_list=[data1, data2, data3],
+                colors=["darkgreen", "purple", "magenta"],
                 results_folder=results_folder,
                 rig_id=rig_id,
                 experimenter=experimenter,
@@ -392,10 +397,10 @@ def main():
                 ),
                 create_evaluation(
                     "Complete Synchronization Pulse",
-                    "Pass when Sync Pulse number equals data length, and when rising and falling give same lengths",
+                    "Pass when 1)rising and falling give the same length; 2)sync Pulse number equals data length",
                     [
                         QCMetric(
-                            name="Data length same (Rising)",
+                            name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
                             value=len(rising_time),
                             status_history=[
                                 Bool2Status(
@@ -405,7 +410,7 @@ def main():
                             reference=str(ref_folder / "SyncPulseDiff.png"),
                         ),
                         QCMetric(
-                            name="Data length same (Falling)",
+                            name="Data length same as one of data length (Value: Falling edge of synch pulse)",
                             value=len(falling_time),
                             status_history=[
                                 Bool2Status(
