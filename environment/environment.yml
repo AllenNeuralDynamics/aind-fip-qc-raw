@@ -6,3 +6,7 @@ credentials:
   access_key_id: AWS_ACCESS_KEY_ID
   secret_access_key: AWS_SECRET_ACCESS_KEY
   region: AWS_DEFAULT_REGION
+- type: general
+  id: 745U6M9QNLEM2BBh
+  description: PROJECT_ID
+  value: CUSTOM_KEY
