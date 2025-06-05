@@ -1,27 +1,24 @@
+import csv
+import glob
+import json
+import logging
 import os
 import shutil
-import logging
-import csv
-import json
-import glob
-import numpy as np
-import utils
-from pathlib import Path
 from datetime import datetime
-import pytz
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-from aind_log_utils.log import setup_logging
-from aind_data_schema.core.quality_control import (
-    QCEvaluation,
-    QCMetric,
-    QCStatus,
-    Stage,
-    Status,
-    QualityControl,
-)
+import numpy as np
+import pytz
+import utils
+from aind_data_schema.core.quality_control import (QCEvaluation, QCMetric,
+                                                   QCStatus, QualityControl,
+                                                   Stage, Status)
 from aind_data_schema_models.modalities import Modality
+from aind_log_utils.log import setup_logging
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
 
 def Bool2Status(boolean_value, t=None):
     """Convert a boolean value to a QCStatus object."""
@@ -53,8 +50,10 @@ def load_csv_data(file_path):
             for row in reader:
                 for i, cell in enumerate(row):
                     if cell == "" and i > 0:
-                        row[i] = row[i-1]
-                        logging.error(f"Error: {file_path} csv file is found but broken -- contains empty string.")
+                        row[i] = row[i - 1]
+                        logging.error(
+                            f"Error: {file_path} csv file is found but broken -- contains empty string."
+                        )
                 rows.append(row)
         return np.array(rows, dtype=np.float32)
 
@@ -65,26 +64,28 @@ def load_csv_data(file_path):
         with open(file_path) as f:
             reader = csv.reader(f)
             rows = [row for row in reader]
-    
+
         max_cols = max(len(row) for row in rows)
-        if len(rows[-1]) < max_cols:    #eliminating the broken last row
+        if len(rows[-1]) < max_cols:  # eliminating the broken last row
             rows.pop()
         return np.array(rows, dtype=np.float32)
 
         logging.error(f"Error: {file_path} csv file is found but broken.")
-        logging.info("The last row of the data with imperfect column numbers were eliminated")
+        logging.info(
+            "The last row of the data with imperfect column numbers were eliminated"
+        )
 
 
 def generate_metrics(
     data_lists,
-    data1,
-    data2,
-    data3,
+    green,
+    iso,
+    red,
     green_floor_ave,
     iso_floor_ave,
     red_floor_ave,
-    rising_time = None,
-    falling_time = None,
+    rising_time=None,
+    falling_time=None,
 ):
     """Generate QC metrics based on data."""
     """Limits are set to 265 for all CMOSFloorDark metrics."""
@@ -93,24 +94,28 @@ def generate_metrics(
     CMOSFloorDark_Red_Limit = 265
     sudden_change_limit = 2000
     metrics = {
-        "IsDataSizeSame": len(data1) == len(data2) == len(data3),
-        "IsDataLongerThan15min": len(data1) > 18000,
-        "NoGreenNan": not np.isnan(data1).any(),
-        "NoIsoNan": not np.isnan(data2).any(),
-        "NoRedNan": not np.isnan(data3).any(),
+        "IsDataSizeSame": len(green) == len(iso) == len(red),
+        "IsDataLongerThan15min": len(green) > 18000,
+        "NoGreenNan": not np.isnan(green).any(),
+        "NoIsoNan": not np.isnan(iso).any(),
+        "NoRedNan": not np.isnan(red).any(),
         "CMOSFloorDark_Green": green_floor_ave < CMOSFloorDark_Green_Limit,
         "CMOSFloorDark_Iso": iso_floor_ave < CMOSFloorDark_Iso_Limit,
         "CMOSFloorDark_Red": red_floor_ave < CMOSFloorDark_Red_Limit,
         "NoSuddenChangeInSignal": all(
             np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
-            for data in [data1, data2, data3]
+            for data in [green, iso, red]
         ),
         "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
     }
 
     if rising_time is not None:
         metrics["IsSyncPulseSame"] = len(rising_time) == len(falling_time)
-        metrics["IsSyncPulseSameAsData"] = len(rising_time) in [len(data1), len(data2), len(data3)]
+        metrics["IsSyncPulseSameAsData"] = len(rising_time) in [
+            len(green),
+            len(iso),
+            len(red),
+        ]
     return metrics
 
 
@@ -135,13 +140,13 @@ def create_evaluation(
 
 def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter):
     """Plot raw frame and cmos data and save to a file."""
-    data1 = data_list[0]
-    data2 = data_list[1]
-    data3 = data_list[2]
+    green = data_list[0]
+    iso = data_list[1]
+    red = data_list[2]
     plt.figure(figsize=(16, 20))
     for i_panel in range(4):
         plt.subplot(12, 1, i_panel + 1)
-        plt.plot(data1[:, i_panel + 1], color=colors[0])
+        plt.plot(green[:, i_panel + 1], color=colors[0])
         if i_panel == 0:
             plt.title(
                 "GreenCh ROI:"
@@ -157,12 +162,12 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
 
     for i_panel in range(4):
         plt.subplot(12, 1, i_panel + 5)
-        plt.plot(data2[:, i_panel + 1], color=colors[1])
+        plt.plot(iso[:, i_panel + 1], color=colors[1])
         plt.title("Iso ROI:" + str(i_panel))
 
     for i_panel in range(4):
         plt.subplot(12, 1, i_panel + 9)
-        plt.plot(data3[:, i_panel + 1], color=colors[2])
+        plt.plot(red[:, i_panel + 1], color=colors[2])
         plt.title("RedCh ROI:" + str(i_panel))
     plt.xlabel("frames (20Hz)")
 
@@ -173,61 +178,61 @@ def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter
     plt.show()
 
 
-def plot_sensor_floor(data1, data2, data3, results_folder):
+def plot_sensor_floor(green, iso, red, results_folder):
     """
     Plot histograms for sensor floor values of three data sets.
 
     Parameters:
-        data1 (numpy.ndarray): Data for GreenCh.
-        data2 (numpy.ndarray): Data for IsoCh.
-        data3 (numpy.ndarray): Data for RedCh.
+        green (numpy.ndarray): Data for GreenCh.
+        iso (numpy.ndarray): Data for IsoCh.
+        red (numpy.ndarray): Data for RedCh.
         results_folder (str): Path to save the output plots.
     """
     plt.figure(figsize=(8, 4))
 
     # GreenCh Floor
     plt.subplot(2, 3, 1)
-    plt.hist(data1[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
+    plt.hist(green[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
     plt.xlim(255, 270)
-    GreenChFloorAve = np.mean(data1[:, -1])
+    GreenChFloorAve = np.mean(green[:, -1])
     plt.title(f"GreenCh FloorAve: {GreenChFloorAve:.2f}")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 4)
-    plt.hist(data1[:, -1], bins=100, color="green", alpha=0.7)
-    GreenChFloorAve = np.mean(data1[:, -1])
+    plt.hist(green[:, -1], bins=100, color="green", alpha=0.7)
+    GreenChFloorAve = np.mean(green[:, -1])
     plt.title(f"GreenFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
     # IsoCh Floor
     plt.subplot(2, 3, 2)
-    plt.hist(data2[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
+    plt.hist(iso[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
     plt.xlim(255, 270)
-    IsoChFloorAve = np.mean(data2[:, -1])
+    IsoChFloorAve = np.mean(iso[:, -1])
     plt.title(f"IsoCh FloorAve: {IsoChFloorAve:.2f}")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 5)
-    plt.hist(data2[:, -1], bins=100, color="purple", alpha=0.7)
-    IsoChFloorAve = np.mean(data2[:, -1])
+    plt.hist(iso[:, -1], bins=100, color="purple", alpha=0.7)
+    IsoChFloorAve = np.mean(iso[:, -1])
     plt.title(f"IsoFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
     # RedCh Floor
     plt.subplot(2, 3, 3)
-    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
-    RedChFloorAve = np.mean(data3[:, -1])
+    plt.hist(red[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
+    RedChFloorAve = np.mean(red[:, -1])
     plt.title(f"RedCh FloorAve: {RedChFloorAve:.2f}")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
     plt.subplot(2, 3, 6)
-    plt.hist(data3[:, -1], bins=100, color="red", alpha=0.7)
-    RedChFloorAve = np.mean(data3[:, -1])
+    plt.hist(red[:, -1], bins=100, color="red", alpha=0.7)
+    RedChFloorAve = np.mean(red[:, -1])
     plt.title(f"RedFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
@@ -275,9 +280,10 @@ def plot_sync_pulse_diff(results_folder, rising_time=None):
     plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
     plt.show()
 
+
 class FiberSettings(BaseSettings, cli_parse_args=True):
     """
-    Settings for Fiber Photometry 
+    Settings for Fiber Photometry
     """
 
     input_directory: Path = Field(
@@ -286,6 +292,7 @@ class FiberSettings(BaseSettings, cli_parse_args=True):
     output_directory: Path = Field(
         default=Path("/results/"), description="Output directory"
     )
+
 
 def main():
     # Paths and setup
@@ -313,28 +320,30 @@ def main():
     rig_id = session_data.get("rig_id")
     experimenter = session_data.get("experimenter_full_name")[0]
 
-    fiber_directories = tuple(fiber_raw_path.glob('*fip*'))
+    fiber_directories = tuple(fiber_raw_path.glob("*fip*"))
     rising_time = None
     falling_time = None
 
-    if fiber_directories: # standard acquisition
+    if fiber_directories:  # standard acquisition
         logging.info(f"Found asset {asset_name}. Starting QC")
         fiber_data = utils.get_fiber_channel_data(fiber_directories[0])
-        columns = [column for column in fiber_data['green'].columns if 'Fiber']
-        fiber_background_columns = columns + ['Background']
-        data1 = fiber_data['green'][fiber_background_columns].to_numpy()
-        data2 = fiber_data['iso'][fiber_background_columns].to_numpy()
-        data3 = fiber_data['red'][fiber_background_columns].to_numpy()
-        data_lists = [data1, data2, data3]
-        
+        columns = [column for column in fiber_data["green"].columns if "Fiber"]
+        fiber_background_columns = columns + ["Background"]
+        green = fiber_data["green"][fiber_background_columns].to_numpy()
+        iso = fiber_data["iso"][fiber_background_columns].to_numpy()
+        red = fiber_data["red"][fiber_background_columns].to_numpy()
+        data_lists = [green, iso, red]
+
     else:
-        logging.warning(f"Found asset with legacy acquisition {asset_name}. Starting QC")
+        logging.warning(
+            f"Found asset with legacy acquisition {asset_name}. Starting QC"
+        )
         # Assuming `fiber_raw_path` is defined earlier in the code
         fiber_channel_patterns = ["FIP_DataG*", "FIP_DataIso_*", "FIP_DataR_*"]
 
         # Use a list comprehension to find matching files
         channel_file_paths = [
-            sorted(fiber_raw_path.glob(fiber_channel))  #sorted based on DAQ time
+            sorted(fiber_raw_path.glob(fiber_channel))  # sorted based on DAQ time
             for fiber_channel in fiber_channel_patterns
         ]
 
@@ -342,17 +351,24 @@ def main():
         fiber_exists = all(channel_file_paths)
 
         if fiber_exists:
-            data_lists = [[load_csv_data(file) for file in file_list] for file_list in channel_file_paths]
-            data1_list, data2_list, data3_list = data_lists #keep all csv files
+            data_lists = [
+                [load_csv_data(file) for file in file_list]
+                for file_list in channel_file_paths
+            ]
+            green_list, iso_list, red_list = data_lists  # keep all csv files
 
             if len(data_lists[0]) > 1:
-                logging.error("Multiple recording files found in this session. Only the largest file was used for QC.")
+                logging.error(
+                    "Multiple recording files found in this session. Only the largest file was used for QC."
+                )
 
-            data1 = max(data1_list, key=lambda x: x.shape[0]) #using only the longest file for each ch
-            data2 = max(data2_list, key=lambda x: x.shape[0])
-            data3 = max(data3_list, key=lambda x: x.shape[0])
+            green = max(
+                green_list, key=lambda x: x.shape[0]
+            )  # using only the longest file for each ch
+            iso = max(iso_list, key=lambda x: x.shape[0])
+            red = max(red_list, key=lambda x: x.shape[0])
 
-            if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
+            if len(green) > 0 and len(iso) > 0 and len(red) > 0:
 
                 # Load behavior JSON (dynamic foraging specific)
                 # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
@@ -363,39 +379,40 @@ def main():
                     rising_time = behavior_json["B_PhotometryRisingTimeHarp"]
                     falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
                 else:
-                    logging.info("NO BEHAVIOR JSON — Non-dynamicforaging or simply missing")
+                    logging.info(
+                        "NO BEHAVIOR JSON — Non-dynamicforaging or simply missing"
+                    )
                     # preparing fake syncpulses
-                    rising_time = list(range(0, len(data1), 50))
-                    falling_time = list(range(0, len(data1), 50))
-
+                    rising_time = list(range(0, len(green), 50))
+                    falling_time = list(range(0, len(green), 50))
 
     # Calculate floor averages
-    green_floor_ave = np.mean(data1[:, -1])
-    iso_floor_ave = np.mean(data2[:, -1])
-    red_floor_ave = np.mean(data3[:, -1])
+    green_floor_ave = np.mean(green[:, -1])
+    iso_floor_ave = np.mean(iso[:, -1])
+    red_floor_ave = np.mean(red[:, -1])
 
     # Generate metrics
     metrics = generate_metrics(
         data_lists,
-        data1,
-        data2,
-        data3,
+        green,
+        iso,
+        red,
         green_floor_ave,
         iso_floor_ave,
         red_floor_ave,
         rising_time=rising_time,
-        falling_time=falling_time
+        falling_time=falling_time,
     )
 
     # Plot data
     plot_cmos_trace_data(
-        data_list=[data1, data2, data3],
+        data_list=[green, iso, red],
         colors=["darkgreen", "purple", "magenta"],
         results_folder=results_folder,
         rig_id=rig_id,
         experimenter=experimenter,
     )
-    plot_sensor_floor(data1, data2, data3, results_folder)
+    plot_sensor_floor(green, iso, red, results_folder)
     plot_sync_pulse_diff(results_folder, rising_time=rising_time)
 
     # Create evaluations with our timezone
@@ -403,34 +420,36 @@ def main():
 
     sync_evaluation = None
     if rising_time is not None:
-        sync_evaluation = create_evaluation(
-            "Complete Synchronization Pulse",
-            "Pass when 1)rising and falling give the same length; 2)sync Pulse number equals data length",
-            [
-                QCMetric(
-                    name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
-                    value=len(rising_time),
-                    status_history=[
-                        Bool2Status(
-                            metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
-                        )
-                    ],
-                    reference=str(ref_folder / "SyncPulseDiff.png"),
-                ),
-                QCMetric(
-                    name="Data length same as one of data length (Value: Falling edge of synch pulse)",
-                    value=len(falling_time),
-                    status_history=[
-                        Bool2Status(
-                            metrics["IsSyncPulseSameAsData"],
-                            t=datetime.now(seattle_tz),
-                        )
-                    ],
-                    reference=str(ref_folder / "SyncPulseDiff.png"),
-                ),
-            ],
-            allow_failed=True,
-        ),
+        sync_evaluation = (
+            create_evaluation(
+                "Complete Synchronization Pulse",
+                "Pass when 1)rising and falling give the same length; 2)sync Pulse number equals data length",
+                [
+                    QCMetric(
+                        name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
+                        value=len(rising_time),
+                        status_history=[
+                            Bool2Status(
+                                metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
+                            )
+                        ],
+                        reference=str(ref_folder / "SyncPulseDiff.png"),
+                    ),
+                    QCMetric(
+                        name="Data length same as one of data length (Value: Falling edge of synch pulse)",
+                        value=len(falling_time),
+                        status_history=[
+                            Bool2Status(
+                                metrics["IsSyncPulseSameAsData"],
+                                t=datetime.now(seattle_tz),
+                            )
+                        ],
+                        reference=str(ref_folder / "SyncPulseDiff.png"),
+                    ),
+                ],
+                allow_failed=True,
+            ),
+        )
 
     evaluations = [
         create_evaluation(
@@ -439,7 +458,7 @@ def main():
             [
                 QCMetric(
                     name="Data length same",
-                    value=len(data1),
+                    value=len(green),
                     status_history=[
                         Bool2Status(
                             metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
@@ -449,7 +468,7 @@ def main():
                 ),
                 QCMetric(
                     name="Session length >15min",
-                    value=len(data1) / 20 / 60,
+                    value=len(green) / 20 / 60,
                     status_history=[
                         Bool2Status(
                             metrics["IsDataLongerThan15min"],
@@ -466,23 +485,21 @@ def main():
             [
                 QCMetric(
                     name="No NaN in Green channel",
-                    value=float(np.sum(np.isnan(data1))),
+                    value=float(np.sum(np.isnan(green))),
                     status_history=[
-                        Bool2Status(
-                            metrics["NoGreenNan"], t=datetime.now(seattle_tz)
-                        )
+                        Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
                     ],
                 ),
                 QCMetric(
                     name="No NaN in Iso channel",
-                    value=float(np.sum(np.isnan(data2))),
+                    value=float(np.sum(np.isnan(iso))),
                     status_history=[
                         Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
                     ],
                 ),
                 QCMetric(
                     name="No NaN in Red channel",
-                    value=float(np.sum(np.isnan(data3))),
+                    value=float(np.sum(np.isnan(red))),
                     status_history=[
                         Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
                     ],
@@ -536,9 +553,9 @@ def main():
                     value=float(
                         np.max(
                             [
-                                np.max(np.diff(data1[10:-2, 1])),
-                                np.max(np.diff(data2[10:-2, 1])),
-                                np.max(np.diff(data3[10:-2, 1])),
+                                np.max(np.diff(green[10:-2, 1])),
+                                np.max(np.diff(iso[10:-2, 1])),
+                                np.max(np.diff(red[10:-2, 1])),
                             ]
                         )
                     ),

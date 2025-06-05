@@ -1,8 +1,10 @@
-import pandas as pd
 from pathlib import Path
 from typing import Dict
 
+import pandas as pd
+
 FIBER_CHANNELS = ("red", "green", "iso")
+
 
 def get_fiber_channel_data(fiber_directory: Path) -> Dict[str, pd.DataFrame]:
     """
@@ -22,8 +24,10 @@ def get_fiber_channel_data(fiber_directory: Path) -> Dict[str, pd.DataFrame]:
     for channel in FIBER_CHANNELS:
         channel_csv_path = tuple(fiber_directory.glob(f"{channel}.csv"))
         if not channel_csv_path:
-            raise FileNotFoundError(f"No {channel} csv found in fiber directory path {fiber_directory}")
+            raise FileNotFoundError(
+                f"No {channel} csv found in fiber directory path {fiber_directory}"
+            )
 
         fiber_data[channel] = pd.read_csv(channel_csv_path[0])
 
-    return fiber_data    
+    return fiber_data
