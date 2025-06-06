@@ -292,6 +292,9 @@ class FiberSettings(BaseSettings, cli_parse_args=True):
     output_directory: Path = Field(
         default=Path("/results/"), description="Output directory"
     )
+    qc_directory: Path = Field(
+        default=Path("qc-raw"), description="Relative path to quality control folder"
+    )
 
 
 def main():
@@ -302,7 +305,7 @@ def main():
     qc_folder = settings.output_directory / "qc-raw"
     qc_folder.mkdir(parents=True, exist_ok=True)
 
-    ref_folder = Path(qc_folder.stem)
+    ref_folder = settings.qc_directory
     results_folder = settings.output_directory.as_posix()
     fiber_exists = True
 
