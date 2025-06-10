@@ -51,7 +51,7 @@ jobs:
                   id
                 }
               }
-            }' -f project="PVT_kwDOBa47bs4AhzQZ" -f item="$ITEM_ID" -f field="PVTSSF_lADOBa47bs4AhzQZzgcOjdk" -f optionId="ab13a6d8"
+            }' -f project="PVT_kwDOBa47bs4AhzQZ" -f item="$ITEM_ID" -f field="PVTSSF_lADOBa47bs4AhzQZzgcOjdk" -f optionId="7f87264f"
 
           # Set Team to Physiology and Behavior
           gh api graphql -f query='
