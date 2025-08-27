@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytz
 import utils
-from aind_data_schema.core.quality_control import (QCEvaluation, QCMetric,
+from aind_data_schema.core.quality_control import (QCMetric,
                                                    QCStatus, QualityControl,
                                                    Stage, Status)
 from aind_data_schema_models.modalities import Modality
@@ -421,180 +421,221 @@ def main():
     # Create evaluations with our timezone
     seattle_tz = pytz.timezone("America/Los_Angeles")
 
-    sync_evaluation = None
+    sync_tag = "Complete Synchronization Pulse"
+    data_length_tag = "Data length check"
+    non_nan_tag = "No NaN values in data"
+    cmos_tag = "CMOS Floor signal"
+    signal_tag = "No sudden changes in signals"
+    single_file_tag = "Single data file per channel in the session"
+
+    sync_metrics = []
     if rising_time is not None:
-        sync_evaluation = (
-            create_evaluation(
-                "Complete Synchronization Pulse",
-                "Pass when 1)rising and falling give the same length; 2)sync Pulse number equals data length",
-                [
-                    QCMetric(
-                        name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
-                        value=len(rising_time),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
-                            )
-                        ],
-                        reference=str(ref_folder / "SyncPulseDiff.png"),
-                    ),
-                    QCMetric(
-                        name="Data length same as one of data length (Value: Falling edge of synch pulse)",
-                        value=len(falling_time),
-                        status_history=[
-                            Bool2Status(
-                                metrics["IsSyncPulseSameAsData"],
-                                t=datetime.now(seattle_tz),
-                            )
-                        ],
-                        reference=str(ref_folder / "SyncPulseDiff.png"),
-                    ),
+        sync_metrics.append(
+            QCMetric(
+                name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
+                modality=Modality.BEHAVIOR,
+                stage=Stage.PROCESSING,
+                value=len(rising_time),
+                status_history=[
+                    Bool2Status(
+                        metrics["IsSyncPulseSame"], t=datetime.now(seattle_tz)
+                    )
                 ],
-                allow_failed=True,
+                reference=str(ref_folder / "SyncPulseDiff.png"),
+                description="Pass when 1)rising and falling give the same length",
+                tags=[sync_tag]
             ),
         )
+        sync_metrics.append(
+            QCMetric(
+                name="Data length same as one of data length (Value: Falling edge of synch pulse)",
+                value=len(falling_time),
+                modality=Modality.BEHAVIOR,
+                stage=Stage.PROCESSING,
+                status_history=[
+                    Bool2Status(
+                        metrics["IsSyncPulseSameAsData"],
+                        t=datetime.now(seattle_tz),
+                    )
+                ],
+                reference=str(ref_folder / "SyncPulseDiff.png"),
+                description="sync Pulse number equals data length",
+                tags=[sync_tag]
+            ),
+        )
+            
+    metrics = [
+        QCMetric(
+            name="Data length same",
+            value=len(green),
+            status_history=[
+                Bool2Status(
+                    metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
+                )
+            ],
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            description = "Fail if data lenght is not same",
+            reference=str(ref_folder / "raw_traces.png"),
+            tags = [data_length_tag]
+        ),
+        QCMetric(
+            name="Session length >15min",
+            value=len(green) / 20 / 60,
+            status_history=[
+                Bool2Status(
+                    metrics["IsDataLongerThan15min"],
+                    t=datetime.now(seattle_tz),
+                )
+            ],
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            description=str(
+                "Pass when data_length for Green/Iso/Red are same "
+                "and the session is >15min",
+            ),
+            reference=str(ref_folder / "raw_traces.png"),
+            tags = [data_length_tag]
+        ),
 
-    evaluations = [
-        create_evaluation(
-            "Data length check",
-            "Pass when data_length for Green/Iso/Red are same and the session is >15min",
-            [
-                QCMetric(
-                    name="Data length same",
-                    value=len(green),
-                    status_history=[
-                        Bool2Status(
-                            metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
-                        )
-                    ],
-                    reference=str(ref_folder / "raw_traces.png"),
-                ),
-                QCMetric(
-                    name="Session length >15min",
-                    value=len(green) / 20 / 60,
-                    status_history=[
-                        Bool2Status(
-                            metrics["IsDataLongerThan15min"],
-                            t=datetime.now(seattle_tz),
-                        )
-                    ],
-                    reference=str(ref_folder / "raw_traces.png"),
-                ),
+        QCMetric(
+            name="No NaN in Green channel",
+            value=float(np.sum(np.isnan(green))),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
             ],
+            description="Pass when no NaN values in the data",
+            tags=[non_nan_tag]
         ),
-        create_evaluation(
-            "No NaN values in data",
-            "Pass when no NaN values in the data",
-            [
-                QCMetric(
-                    name="No NaN in Green channel",
-                    value=float(np.sum(np.isnan(green))),
-                    status_history=[
-                        Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
-                    ],
-                ),
-                QCMetric(
-                    name="No NaN in Iso channel",
-                    value=float(np.sum(np.isnan(iso))),
-                    status_history=[
-                        Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
-                    ],
-                ),
-                QCMetric(
-                    name="No NaN in Red channel",
-                    value=float(np.sum(np.isnan(red))),
-                    status_history=[
-                        Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
-                    ],
-                ),
+        QCMetric(
+            name="No NaN in Iso channel",
+            value=float(np.sum(np.isnan(iso))),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
             ],
-            allow_failed=False,
+            description="Pass when no NaN values in the data",
+            tags=[non_nan_tag]
         ),
-        create_evaluation(
-            "CMOS Floor signal",
-            "Pass when CMOS dark floor is <265 in all channel",
-            [
-                QCMetric(
-                    name="Floor average signal in Green channel",
-                    value=float(green_floor_ave),
-                    status_history=[
-                        Bool2Status(
-                            metrics["CMOSFloorDark_Green"],
-                            t=datetime.now(seattle_tz),
-                        )
-                    ],
-                    reference=str(ref_folder / "CMOS_Floor.png"),
-                ),
-                QCMetric(
-                    name="Floor average signal in Iso channel",
-                    value=float(iso_floor_ave),
-                    status_history=[
-                        Bool2Status(
-                            metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
-                        )
-                    ],
-                    reference=str(ref_folder / "CMOS_Floor.png"),
-                ),
-                QCMetric(
-                    name="Floor average signal in Red channel",
-                    value=float(red_floor_ave),
-                    status_history=[
-                        Bool2Status(
-                            metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
-                        )
-                    ],
-                    reference=str(ref_folder / "CMOS_Floor.png"),
-                ),
+        QCMetric(
+            name="No NaN in Red channel",
+            value=float(np.sum(np.isnan(red))),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
             ],
+            description="Pass when no NaN values in the data",
+            tags=[non_nan_tag]
         ),
-        create_evaluation(
-            "No sudden changes in signals",
-            "Pass when no sudden change in signal",
-            [
-                QCMetric(
-                    name="Max 1st derivative",
-                    value=float(
-                        np.max(
-                            [
-                                np.max(np.diff(green[10:-2, 1])),
-                                np.max(np.diff(iso[10:-2, 1])),
-                                np.max(np.diff(red[10:-2, 1])),
-                            ]
-                        )
-                    ),
-                    status_history=[
-                        Bool2Status(
-                            metrics["NoSuddenChangeInSignal"],
-                            t=datetime.now(seattle_tz),
-                        )
-                    ],
-                    reference=str(ref_folder / "raw_traces.png"),
-                ),
+        QCMetric(
+            name="Floor average signal in Green channel",
+            value=float(green_floor_ave),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(
+                    metrics["CMOSFloorDark_Green"],
+                    t=datetime.now(seattle_tz),
+                )
             ],
+            reference=str(ref_folder / "CMOS_Floor.png"),
+            description="Pass when CMOS dark floor is <265 in all channel",
+            tags=[cmos_tag]
         ),
-        create_evaluation(
-            "Single data file per channel in the session",
-            "Pass when the session folder has only one data per channel",
-            [
-                QCMetric(
-                    name="Number of data files per channel",
-                    description="When FIP-Bonsai workflow starts/stops multiple times, it would generate multiple CSVs, RawMovie files, etc",
-                    value=len(data_lists[0]),
-                    status_history=[
-                        Bool2Status(
-                            metrics["IsSingleRecordingPerSession"],
-                            t=datetime.now(seattle_tz),
-                        )
-                    ],
-                ),
+        QCMetric(
+            name="Floor average signal in Iso channel",
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            value=float(iso_floor_ave),
+            status_history=[
+                Bool2Status(
+                    metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
+                )
             ],
+            reference=str(ref_folder / "CMOS_Floor.png"),
+            description="Pass when CMOS dark floor is <265 in all channel",
+            tags=[cmos_tag]
         ),
+        QCMetric(
+            name="Floor average signal in Red channel",
+            value=float(red_floor_ave),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(
+                    metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
+                )
+            ],
+            reference=str(ref_folder / "CMOS_Floor.png"),
+            description="Pass when CMOS dark floor is <265 in all channel",
+            tags=[cmos_tag]
+        ),
+        QCMetric(
+            name="Max 1st derivative",
+            value=float(
+                np.max(
+                    [
+                        np.max(np.diff(green[10:-2, 1])),
+                        np.max(np.diff(iso[10:-2, 1])),
+                        np.max(np.diff(red[10:-2, 1])),
+                    ]
+                )
+            ),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            status_history=[
+                Bool2Status(
+                    metrics["NoSuddenChangeInSignal"],
+                    t=datetime.now(seattle_tz),
+                )
+            ],
+            reference=str(ref_folder / "raw_traces.png"),
+            description="Pass when no sudden change in signal",
+            tags=[signal_tag]
+        ),
+        QCMetric(
+            name="Number of data files per channel",
+            description=str(
+                "When FIP-Bonsai workflow starts/stops multiple times, " 
+                "it would generate multiple CSVs, RawMovie files, etc",
+            ),
+            modality=Modality.BEHAVIOR,
+            stage=Stage.PROCESSING,
+            value=len(data_lists[0]),
+            status_history=[
+                Bool2Status(
+                    metrics["IsSingleRecordingPerSession"],
+                    t=datetime.now(seattle_tz),
+                )
+            ],
+            tags=[single_file_tag]
+        ),
+
     ]
 
-    if sync_evaluation is not None:
-        evaluations.append(sync_evaluation[0])
+    if sync_metrics:
+        for metric in sync_metrics:
+            metrics.append(metric)
     # Create QC object and save
-    qc = QualityControl(evaluations=evaluations)
+    qc = QualityControl(
+        metrics=metrics,
+        allow_tag_failures=[
+            sync_tag,
+        ],
+        default_grouping=[
+            sync_tag,
+            data_length_tag,
+            non_nan_tag,
+            cmos_tag,
+            signal_tag,
+            single_file_tag
+            
+        ]
+    )
     qc.write_standard_file(output_directory=str(results_folder))
 
     # We'd like to have our files organized such that QC is in the
