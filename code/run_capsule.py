@@ -10,14 +10,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pytz
-import utils
-from aind_data_schema.core.quality_control import (QCMetric,
-                                                   QCStatus, QualityControl,
-                                                   Stage, Status)
+from aind_data_schema.core.quality_control import (QCMetric, QCStatus,
+                                                   QualityControl, Stage,
+                                                   Status)
 from aind_data_schema_models.modalities import Modality
 from aind_log_utils.log import setup_logging
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+import utils
 
 
 def Bool2Status(boolean_value, t=None):
@@ -52,7 +53,8 @@ def load_csv_data(file_path):
                     if cell == "" and i > 0:
                         row[i] = row[i - 1]
                         logging.error(
-                            f"Error: {file_path} csv file is found but broken -- contains empty string."
+                            f"Error: {file_path} csv file is "
+                            "found but broken -- contains empty string."
                         )
                 rows.append(row)
         return np.array(rows, dtype=np.float32)
@@ -72,7 +74,8 @@ def load_csv_data(file_path):
 
         logging.error(f"Error: {file_path} csv file is found but broken.")
         logging.info(
-            "The last row of the data with imperfect column numbers were eliminated"
+            "The last row of the data with "
+            "imperfect column numbers were eliminated"
         )
 
 
@@ -119,26 +122,9 @@ def generate_metrics(
     return metrics
 
 
-def create_evaluation(
-    name,
-    description,
-    metrics,
-    modality=Modality.FIB,
-    stage=Stage.RAW,
-    allow_failed=False,
+def plot_cmos_trace_data(
+    data_list, colors, results_folder, rig_id, experimenter
 ):
-    """Create a QC evaluation object."""
-    return QCEvaluation(
-        name=name,
-        modality=modality,
-        stage=stage,
-        metrics=metrics,
-        allow_failed_metrics=allow_failed,
-        description=description,
-    )
-
-
-def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter):
     """Plot raw frame and cmos data and save to a file."""
     green = data_list[0]
     iso = data_list[1]
@@ -192,7 +178,9 @@ def plot_sensor_floor(green, iso, red, results_folder):
 
     # GreenCh Floor
     plt.subplot(2, 3, 1)
-    plt.hist(green[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
+    plt.hist(
+        green[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7
+    )
     plt.xlim(255, 270)
     GreenChFloorAve = np.mean(green[:, -1])
     plt.title(f"GreenCh FloorAve: {GreenChFloorAve:.2f}")
@@ -202,7 +190,7 @@ def plot_sensor_floor(green, iso, red, results_folder):
     plt.subplot(2, 3, 4)
     plt.hist(green[:, -1], bins=100, color="green", alpha=0.7)
     GreenChFloorAve = np.mean(green[:, -1])
-    plt.title(f"GreenFloor - All data")
+    plt.title("GreenFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
@@ -218,7 +206,7 @@ def plot_sensor_floor(green, iso, red, results_folder):
     plt.subplot(2, 3, 5)
     plt.hist(iso[:, -1], bins=100, color="purple", alpha=0.7)
     IsoChFloorAve = np.mean(iso[:, -1])
-    plt.title(f"IsoFloor - All data")
+    plt.title("IsoFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
@@ -233,7 +221,7 @@ def plot_sensor_floor(green, iso, red, results_folder):
     plt.subplot(2, 3, 6)
     plt.hist(red[:, -1], bins=100, color="red", alpha=0.7)
     RedChFloorAve = np.mean(red[:, -1])
-    plt.title(f"RedFloor - All data")
+    plt.title("RedFloor - All data")
     plt.xlabel("CMOS pixel val")
     plt.ylabel("counts")
 
@@ -241,7 +229,9 @@ def plot_sensor_floor(green, iso, red, results_folder):
     plt.subplots_adjust(hspace=0.8)
 
     # Save and show the plot
-    plt.savefig(f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        f"{results_folder}/CMOS_Floor.png", dpi=300, bbox_inches="tight"
+    )
     plt.savefig(f"{results_folder}/CMOS_Floor.pdf")
     plt.show()
 
@@ -276,7 +266,9 @@ def plot_sync_pulse_diff(results_folder, rising_time=None):
     plt.subplots_adjust(wspace=0.8)
 
     # Save and show the plot
-    plt.savefig(f"{results_folder}/SyncPulseDiff.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        f"{results_folder}/SyncPulseDiff.png", dpi=300, bbox_inches="tight"
+    )
     plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
     plt.show()
 
@@ -287,13 +279,15 @@ class FiberSettings(BaseSettings, cli_parse_args=True):
     """
 
     input_directory: Path = Field(
-        default=Path("/data/fiber_raw_data"), description="Directory where data is"
+        default=Path("/data/fiber_raw_data"),
+        description="Directory where data is",
     )
     output_directory: Path = Field(
         default=Path("/results/"), description="Output directory"
     )
     qc_directory: Path = Field(
-        default=Path("qc-raw"), description="Relative path to quality control folder"
+        default=Path("qc-raw"),
+        description="Relative path to quality control folder",
     )
 
 
@@ -315,9 +309,13 @@ def main():
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
 
-    data_disc_json = load_json_file(settings.input_directory / "data_description.json")
+    data_disc_json = load_json_file(
+        settings.input_directory / "data_description.json"
+    )
     asset_name = data_disc_json.get("name")
-    setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
+    setup_logging(
+        "aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name
+    )
 
     session_data = load_json_file(settings.input_directory / "session.json")
     rig_id = session_data.get("rig_id")
@@ -346,7 +344,9 @@ def main():
 
         # Use a list comprehension to find matching files
         channel_file_paths = [
-            sorted(fiber_raw_path.glob(fiber_channel))  # sorted based on DAQ time
+            sorted(
+                fiber_raw_path.glob(fiber_channel)
+            )  # sorted based on DAQ time
             for fiber_channel in fiber_channel_patterns
         ]
 
@@ -362,7 +362,8 @@ def main():
 
             if len(data_lists[0]) > 1:
                 logging.error(
-                    "Multiple recording files found in this session. Only the largest file was used for QC."
+                    "Multiple recording files found in this session."
+                    "Only the largest file was used for QC."
                 )
 
             green = max(
@@ -375,7 +376,11 @@ def main():
 
                 # Load behavior JSON (dynamic foraging specific)
                 # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
-                pattern = "/data/fiber_raw_data/behavior/[0-9]*_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9][0-9]-[0-9][0-9]-[0-9][0-9].json"
+                pattern = str(
+                    "/data/fiber_raw_data/behavior/[0-9]*_[0-9]"
+                    "[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_[0-9]"
+                    "[0-9]-[0-9][0-9]-[0-9][0-9].json"
+                )
                 matching_behavior_files = glob.glob(pattern)
                 if matching_behavior_files:
                     behavior_json = load_json_file(matching_behavior_files[0])
@@ -383,7 +388,8 @@ def main():
                     falling_time = behavior_json["B_PhotometryFallingTimeHarp"]
                 else:
                     logging.info(
-                        "NO BEHAVIOR JSON — Non-dynamicforaging or simply missing"
+                        "NO BEHAVIOR JSON — "
+                        "Non-dynamicforaging or simply missing"
                     )
                     # preparing fake syncpulses
                     rising_time = list(range(0, len(green), 50))
@@ -432,7 +438,10 @@ def main():
     if rising_time is not None:
         sync_metrics.append(
             QCMetric(
-                name="Rising/Falling of Sync pulses same length (Value: Rising edge of synch pulse)",
+                name=str(
+                    "Rising/Falling of Sync pulses same length "
+                    "(Value: Rising edge of synch pulse)"
+                ),
                 modality=Modality.BEHAVIOR,
                 stage=Stage.PROCESSING,
                 value=len(rising_time),
@@ -442,13 +451,19 @@ def main():
                     )
                 ],
                 reference=str(ref_folder / "SyncPulseDiff.png"),
-                description="Pass when 1)rising and falling give the same length",
-                tags=[sync_tag]
+                description=str(
+                    "Pass when 1)rising and "
+                    "falling give the same length",
+                ),
+                tags=[sync_tag],
             ),
         )
         sync_metrics.append(
             QCMetric(
-                name="Data length same as one of data length (Value: Falling edge of synch pulse)",
+                name=str(
+                    "Data length same as one of data length"
+                    "(Value: Falling edge of synch pulse)",
+                ),
                 value=len(falling_time),
                 modality=Modality.BEHAVIOR,
                 stage=Stage.PROCESSING,
@@ -460,10 +475,10 @@ def main():
                 ],
                 reference=str(ref_folder / "SyncPulseDiff.png"),
                 description="sync Pulse number equals data length",
-                tags=[sync_tag]
+                tags=[sync_tag],
             ),
         )
-            
+
     metrics = [
         QCMetric(
             name="Data length same",
@@ -475,9 +490,9 @@ def main():
             ],
             modality=Modality.BEHAVIOR,
             stage=Stage.PROCESSING,
-            description = "Fail if data lenght is not same",
+            description="Fail if data lenght is not same",
             reference=str(ref_folder / "raw_traces.png"),
-            tags = [data_length_tag]
+            tags=[data_length_tag],
         ),
         QCMetric(
             name="Session length >15min",
@@ -495,9 +510,8 @@ def main():
                 "and the session is >15min",
             ),
             reference=str(ref_folder / "raw_traces.png"),
-            tags = [data_length_tag]
+            tags=[data_length_tag],
         ),
-
         QCMetric(
             name="No NaN in Green channel",
             value=float(np.sum(np.isnan(green))),
@@ -507,7 +521,7 @@ def main():
                 Bool2Status(metrics["NoGreenNan"], t=datetime.now(seattle_tz))
             ],
             description="Pass when no NaN values in the data",
-            tags=[non_nan_tag]
+            tags=[non_nan_tag],
         ),
         QCMetric(
             name="No NaN in Iso channel",
@@ -518,7 +532,7 @@ def main():
                 Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
             ],
             description="Pass when no NaN values in the data",
-            tags=[non_nan_tag]
+            tags=[non_nan_tag],
         ),
         QCMetric(
             name="No NaN in Red channel",
@@ -529,7 +543,7 @@ def main():
                 Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
             ],
             description="Pass when no NaN values in the data",
-            tags=[non_nan_tag]
+            tags=[non_nan_tag],
         ),
         QCMetric(
             name="Floor average signal in Green channel",
@@ -544,7 +558,7 @@ def main():
             ],
             reference=str(ref_folder / "CMOS_Floor.png"),
             description="Pass when CMOS dark floor is <265 in all channel",
-            tags=[cmos_tag]
+            tags=[cmos_tag],
         ),
         QCMetric(
             name="Floor average signal in Iso channel",
@@ -558,7 +572,7 @@ def main():
             ],
             reference=str(ref_folder / "CMOS_Floor.png"),
             description="Pass when CMOS dark floor is <265 in all channel",
-            tags=[cmos_tag]
+            tags=[cmos_tag],
         ),
         QCMetric(
             name="Floor average signal in Red channel",
@@ -572,7 +586,7 @@ def main():
             ],
             reference=str(ref_folder / "CMOS_Floor.png"),
             description="Pass when CMOS dark floor is <265 in all channel",
-            tags=[cmos_tag]
+            tags=[cmos_tag],
         ),
         QCMetric(
             name="Max 1st derivative",
@@ -595,12 +609,12 @@ def main():
             ],
             reference=str(ref_folder / "raw_traces.png"),
             description="Pass when no sudden change in signal",
-            tags=[signal_tag]
+            tags=[signal_tag],
         ),
         QCMetric(
             name="Number of data files per channel",
             description=str(
-                "When FIP-Bonsai workflow starts/stops multiple times, " 
+                "When FIP-Bonsai workflow starts/stops multiple times, "
                 "it would generate multiple CSVs, RawMovie files, etc",
             ),
             modality=Modality.BEHAVIOR,
@@ -612,9 +626,8 @@ def main():
                     t=datetime.now(seattle_tz),
                 )
             ],
-            tags=[single_file_tag]
+            tags=[single_file_tag],
         ),
-
     ]
 
     if sync_metrics:
@@ -632,9 +645,8 @@ def main():
             non_nan_tag,
             cmos_tag,
             signal_tag,
-            single_file_tag
-            
-        ]
+            single_file_tag,
+        ],
     )
     qc.write_standard_file(output_directory=str(results_folder))
 
