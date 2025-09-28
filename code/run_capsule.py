@@ -296,6 +296,24 @@ class FiberSettings(BaseSettings, cli_parse_args=True):
         default=Path("qc-raw"), description="Relative path to quality control folder"
     )
 
+def get_dir_size(path: Path) -> int:
+    """
+    Gets the directory size to handle
+    restarts
+
+    Parameters
+    ----------
+    path: Path
+        The path to directory
+    
+    Returns
+    -------
+    int
+        The size of directory
+    """
+
+    # Only immediate files
+    return sum(f.stat().st_size for f in path.glob("*") if f.is_file())
 
 def main():
     # Paths and setup
@@ -329,7 +347,11 @@ def main():
 
     if fiber_directories:  # standard acquisition
         logging.info(f"Found asset {asset_name}. Starting QC")
-        fiber_data = utils.get_fiber_channel_data(fiber_directories[0])
+        if len(fiber_directories) > 1:
+            logging.info("Multiple recordings detected. Choosing largest")
+
+        largest_dir = max(fiber_directories, key=get_dir_size)
+        fiber_data = get_fiber_data_by_channel(largest_dir)
         columns = [column for column in fiber_data["green"].columns if "Fiber"]
         fiber_background_columns = columns + ["Background"]
         green = fiber_data["green"][fiber_background_columns].to_numpy()
