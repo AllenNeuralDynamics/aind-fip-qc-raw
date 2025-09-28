@@ -317,9 +317,9 @@ def main():
         "aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name
     )
 
-    session_data = load_json_file(settings.input_directory / "session.json")
-    rig_id = session_data.get("rig_id")
-    experimenter = session_data.get("experimenter_full_name")[0]
+    session_data = load_json_file(settings.input_directory / "acquisition.json")
+    rig_id = session_data.get("instrument_id")
+    experimenter = session_data.get("experimenters")[0]
 
     fiber_directories = tuple(fiber_raw_path.glob("*fip*"))
     rising_time = None
