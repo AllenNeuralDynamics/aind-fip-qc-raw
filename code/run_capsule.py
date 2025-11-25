@@ -44,19 +44,31 @@ def load_json_file(file_path):
 
 def load_csv_data(file_path):
     """Load CSV data into a NumPy array."""
+    
+    expected_header = ["SoftwareTS", "ROI0", "ROI1", "ROI2", "ROI3", "ROI4_sensorfloor", "HarpTS"]
+    
     try:
+        # Check for legacy header
+        with open(file_path, newline='') as f:
+            first_line = f.readline().strip().split(",")
+        skip_first_row = first_line == expected_header
+
         rows = []
-        with open(file_path) as f:
+        with open(file_path, newline='') as f:
             reader = csv.reader(f)
+            if skip_first_row:
+                next(reader)  # skip header row
             for row in reader:
+                # Drop 'HarpTS' if present as last column
+                if skip_first_row:
+                    row = row[:-1]
                 for i, cell in enumerate(row):
                     if cell == "" and i > 0:
-                        row[i] = row[i - 1]
-                        logging.error(
-                            f"Error: {file_path} csv file is "
-                            "found but broken -- contains empty string."
-                        )
+                        row[i] = row[i-1]
+                        logging.error(f"Error: {file_path} csv file is found but broken -- contains empty string.")
                 rows.append(row)
+
+        # Convert to NumPy array
         return np.array(rows, dtype=np.float32)
 
     except FileNotFoundError:
@@ -66,17 +78,14 @@ def load_csv_data(file_path):
         with open(file_path) as f:
             reader = csv.reader(f)
             rows = [row for row in reader]
-
+    
         max_cols = max(len(row) for row in rows)
-        if len(rows[-1]) < max_cols:  # eliminating the broken last row
+        if len(rows[-1]) < max_cols:    #eliminating the broken last row
             rows.pop()
         return np.array(rows, dtype=np.float32)
 
         logging.error(f"Error: {file_path} csv file is found but broken.")
-        logging.info(
-            "The last row of the data with "
-            "imperfect column numbers were eliminated"
-        )
+        logging.info("The last row of the data with imperfect column numbers were eliminated")
 
 
 def generate_metrics(
