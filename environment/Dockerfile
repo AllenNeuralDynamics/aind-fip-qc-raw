@@ -1,10 +1,12 @@
-# hash:sha256:9c386514ae044c460e38e14e6d72fb5a411a67c21a03803099f1b8f49dba7ffd
+# hash:sha256:f4f77d61e4f72f98a41f686a9812b1df516dd551a6ecc462abc3b69f38819c13
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG GIT_ASKPASS
 COPY git-ask-pass /
+
+ENV PROCESS_NAME=aind-fip-qc-raw
 
 RUN pip install -U --no-cache-dir \
     aind-data-access-api[docdb]==0.16.1 \

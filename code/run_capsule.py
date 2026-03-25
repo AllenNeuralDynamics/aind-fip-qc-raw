@@ -5,7 +5,6 @@ import csv
 import json
 import glob
 import numpy as np
-from dotenv import load_dotenv
 from pathlib import Path
 from datetime import datetime
 import pytz
@@ -288,7 +287,6 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
-    load_dotenv("/code/.env")
     process_name = os.getenv("PROCESS_NAME")
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
