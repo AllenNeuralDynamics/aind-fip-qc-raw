@@ -600,9 +600,8 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        logging.error(
+        logging.exception(
             "Pipeline stage failed",
             extra={"event_type": "stage_error"}
         )
-        logging.exception(e)
         raise
