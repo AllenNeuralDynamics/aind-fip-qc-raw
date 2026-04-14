@@ -1,4 +1,4 @@
-# hash:sha256:f4f77d61e4f72f98a41f686a9812b1df516dd551a6ecc462abc3b69f38819c13
+# hash:sha256:aae7d23e3b1c8e52172cd8c977a796cf79b8e04384a1207e313c5f90da1d97b0
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04
 
@@ -9,13 +9,10 @@ COPY git-ask-pass /
 ENV PROCESS_NAME=aind-fip-qc-raw
 
 RUN pip install -U --no-cache-dir \
-    aind-data-access-api[docdb]==0.16.1 \
     aind-data-schema==1.2.0 \
     aind-data-schema-models==0.7.0 \
-    aind-log-utils==0.2.1 \
     aws-requests-auth==0.4.3 \
     boto3==1.35.81 \
-    dotenv==0.9.9 \
     kachery-cloud==0.4.10 \
     matplotlib==3.7.5 \
     numpy==1.24.4 \
