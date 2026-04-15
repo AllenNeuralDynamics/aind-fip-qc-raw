@@ -9,7 +9,6 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 import matplotlib.pyplot as plt
-from aind_log_utils.log import setup_logging
 from aind_data_schema.core.quality_control import (
     QCEvaluation,
     QCMetric,
