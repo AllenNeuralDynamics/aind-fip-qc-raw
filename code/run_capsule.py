@@ -293,7 +293,8 @@ def main():
     setup_logging(
         process_name,
         acquisition_name=asset_name,
-        process_name=process_name
+        process_name=process_name,
+        pipeline_name=os.getenv("PIPELINE_NAME","")
     )
     logging.info("Begin processing...", extra={"event_type": "stage_start"})
     fiber_raw_path = fiber_base_path / "fib"
