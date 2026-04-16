@@ -1,23 +1,15 @@
 {
 	"version": 1,
 	"base_image": "codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04",
-	"args": [
-		"AWS_ACCESS_KEY_ID",
-		"AWS_DEFAULT_REGION",
-		"AWS_SECRET_ACCESS_KEY"
-	],
 	"post_install": true,
 	"options": {
 		"registry_host_arg": true,
-		"git_ask_pass": true
+		"git_ask_pass": true,
+		"mount_secrets": true
 	},
 	"installers": {
 		"pip": {
 			"packages": [
-				{
-					"name": "aind-data-access-api[docdb]",
-					"version": "0.16.1"
-				},
 				{
 					"name": "aind-data-schema",
 					"version": "1.2.0"
@@ -25,10 +17,6 @@
 				{
 					"name": "aind-data-schema-models",
 					"version": "0.7.0"
-				},
-				{
-					"name": "aind-log-utils",
-					"version": "0.2.1"
 				},
 				{
 					"name": "aws-requests-auth",
@@ -53,6 +41,14 @@
 				{
 					"name": "pandas",
 					"version": "2.0.3"
+				},
+				{
+					"name": "pyyaml",
+					"version": "6.0.3"
+				},
+				{
+					"name": "watchtower",
+					"version": "3.4.0"
 				}
 			],
 			"options": {},
@@ -60,9 +56,6 @@
 		},
 		"vscode": {
 			"packages": [
-				{
-					"name": "REditorSupport.R"
-				},
 				{
 					"name": "continue.continue"
 				},
@@ -73,7 +66,10 @@
 					"name": "ms-toolsai.jupyter"
 				},
 				{
-					"name": "reageyao.bioSyntax"
+					"name": "reageyao.biosyntax"
+				},
+				{
+					"name": "reditorsupport.r"
 				},
 				{
 					"name": "saoudrizwan.claude-dev"
@@ -81,5 +77,11 @@
 			],
 			"version": "4.95.3"
 		}
-	}
+	},
+	"env_variables": [
+		{
+			"name": "PROCESS_NAME",
+			"value": "aind-fip-qc-raw"
+		}
+	]
 }

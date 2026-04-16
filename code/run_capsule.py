@@ -9,7 +9,6 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 import matplotlib.pyplot as plt
-from aind_log_utils.log import setup_logging
 from aind_data_schema.core.quality_control import (
     QCEvaluation,
     QCMetric,
@@ -19,6 +18,7 @@ from aind_data_schema.core.quality_control import (
     QualityControl,
 )
 from aind_data_schema_models.modalities import Modality
+from aind_logging import setup_logging
 
 
 def Bool2Status(boolean_value, t=None):
@@ -286,7 +286,16 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 def main():
     # Paths and setup
     fiber_base_path = Path("/data/fiber_raw_data")
-
+    process_name = os.getenv("PROCESS_NAME")
+    data_disc_json = load_json_file(fiber_base_path / "data_description.json")
+    asset_name = data_disc_json.get("name")
+    setup_logging(
+        process_name,
+        acquisition_name=asset_name,
+        process_name=process_name,
+        pipeline_name=os.getenv("PIPELINE_NAME","")
+    )
+    logging.info("Begin processing...", extra={"event_type": "stage_start"})
     fiber_raw_path = fiber_base_path / "fib"
     results_folder = Path("../results/")
     results_folder.mkdir(parents=True, exist_ok=True)
@@ -302,9 +311,7 @@ def main():
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
 
-    data_disc_json = load_json_file(fiber_base_path / "data_description.json")
-    asset_name = data_disc_json.get("name")
-    setup_logging("aind-fip-qc-raw", mouse_id=subject_id, session_name=asset_name)
+    
 
     session_data = load_json_file(fiber_base_path / "session.json")
     rig_id = session_data.get("rig_id")
@@ -585,8 +592,16 @@ def main():
         with open(qc_file_path, "w") as file:
             file.write("FIP data files are missing. This may be a behavior session.")
 
-        print(f"Empty file created at: {qc_file_path}")
+        logging.info(f"Empty file created at: {qc_file_path}")
+    logging.info("Pipeline stage completed", extra={"event_type": "stage_complete"})
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.exception(
+            "Pipeline stage failed",
+            extra={"event_type": "stage_error"}
+        )
+        raise
