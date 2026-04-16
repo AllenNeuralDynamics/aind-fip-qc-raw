@@ -195,7 +195,7 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 
 def main():
     # Paths and setup
-    fiber_base_path = Path("/data/fiber_raw_data")
+    fiber_base_path = Path(os.getenv("FIBER_DATA_PATH", "/data/fiber_raw_data"))
     process_name = os.getenv("PROCESS_NAME")
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
