@@ -26,7 +26,7 @@ def load_json_file(file_path: Path | str) -> dict:
         logging.error(f"Error: {file_path} not found.")
 
 
-def load_csv_data(file_path: Path | str) -> np.ndarray:
+(file_path: Path | str) -> np.ndarray:
     """Load FIP channel CSV data into a NumPy array.
 
     Handles both legacy files (with a header row) and headerless files.
