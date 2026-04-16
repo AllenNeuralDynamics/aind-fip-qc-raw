@@ -16,38 +16,24 @@ from aind_logging import setup_logging
 from data_io import load_json_file, load_csv_data
 from evaluations import Bool2Status, create_evaluation, check_empty_channel_csvs
 
-def generate_metrics(
-    data_lists,
-    data1,
-    data2,
-    data3,
-    rising_time,
-    falling_time,
-    green_floor_ave,
-    iso_floor_ave,
-    red_floor_ave,
-):
+def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
     """Generate QC metrics based on data."""
     """Limits are set to 265 for all CMOSFloorDark metrics."""
-    CMOSFloorDark_Green_Limit = 265
-    CMOSFloorDark_Iso_Limit = 265
-    CMOSFloorDark_Red_Limit = 265
+    CMOSFloorDark_Limit = 265
     sudden_change_limit = 2000
+    channel_lengths = [len(data) for _, data in loaded_channels]
+    floor_aves = {name: float(np.mean(data[:, -1])) for name, data in loaded_channels}
     metrics = {
-        "IsDataSizeSame": len(data1) == len(data2) == len(data3),
-        "IsDataLongerThan15min": len(data1) > 18000,
+        "IsDataSizeSame": len(set(channel_lengths)) == 1,
+        "IsDataLongerThan15min": channel_lengths[0] > 18000,
         "IsSyncPulseSame": len(rising_time) == len(falling_time),
-        "IsSyncPulseSameAsData": len(rising_time)
-        in [len(data1), len(data2), len(data3)],
-        "NoGreenNan": not np.isnan(data1).any(),
-        "NoIsoNan": not np.isnan(data2).any(),
-        "NoRedNan": not np.isnan(data3).any(),
-        "CMOSFloorDark_Green": green_floor_ave < CMOSFloorDark_Green_Limit,
-        "CMOSFloorDark_Iso": iso_floor_ave < CMOSFloorDark_Iso_Limit,
-        "CMOSFloorDark_Red": red_floor_ave < CMOSFloorDark_Red_Limit,
+        "IsSyncPulseSameAsData": len(rising_time) in channel_lengths,
+        "NoNan": {name: not np.isnan(data).any() for name, data in loaded_channels},
+        "CMOSFloorDark": {name: floor_aves[name] < CMOSFloorDark_Limit for name, data in loaded_channels},
+        "FloorAves": floor_aves,
         "NoSuddenChangeInSignal": all(
             np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
-            for data in [data1, data2, data3]
+            for _, data in loaded_channels
         ),
         "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
     }
@@ -250,12 +236,20 @@ def main():
         data2 = max(data2_list, key=lambda x: x.shape[0])
         data3 = max(data3_list, key=lambda x: x.shape[0])
 
+        channel_names = ["Green", "Iso", "Red"]
+        loaded_channels = [
+            (name, data)
+            for name, data in zip(channel_names, [data1, data2, data3])
+            if len(data) > 0
+        ]
+        n_channels = len(loaded_channels)
+
         seattle_tz = pytz.timezone("America/Los_Angeles")
         evaluations = [
             check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz)
         ]
 
-        if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
+        if n_channels >= 2:
 
             # Load behavior JSON (dynamic foraging specific)
             # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
@@ -268,37 +262,27 @@ def main():
             else:
                 logging.info("NO BEHAVIOR JSON — Non-dynamicforaging or simply missing")
                 # preparing fake syncpulses
-                rising_time = list(range(0, len(data1), 50))
-                falling_time = list(range(0, len(data1), 50))
-
-
-            # Calculate floor averages
-            green_floor_ave = np.mean(data1[:, -1])
-            iso_floor_ave = np.mean(data2[:, -1])
-            red_floor_ave = np.mean(data3[:, -1])
+                rising_time = list(range(0, len(loaded_channels[0][1]), 50))
+                falling_time = list(range(0, len(loaded_channels[0][1]), 50))
 
             # Generate metrics
             metrics = generate_metrics(
                 data_lists,
-                data1,
-                data2,
-                data3,
+                loaded_channels,
                 rising_time,
                 falling_time,
-                green_floor_ave,
-                iso_floor_ave,
-                red_floor_ave,
             )
 
-            # Plot data
-            plot_cmos_trace_data(
-                data_list=[data1, data2, data3],
-                colors=["darkgreen", "purple", "magenta"],
-                results_folder=results_folder,
-                rig_id=rig_id,
-                experimenter=experimenter,
-            )
-            plot_sensor_floor(data1, data2, data3, results_folder)
+            # Plot data (only when all 3 channels present — plot functions assume 3 channels)
+            if n_channels == 3:
+                plot_cmos_trace_data(
+                    data_list=[data1, data2, data3],
+                    colors=["darkgreen", "purple", "magenta"],
+                    results_folder=results_folder,
+                    rig_id=rig_id,
+                    experimenter=experimenter,
+                )
+                plot_sensor_floor(data1, data2, data3, results_folder)
             plot_sync_pulse_diff(rising_time, results_folder)
 
             # Create evaluations with our timezone
@@ -309,7 +293,7 @@ def main():
                     [
                         QCMetric(
                             name="Data length same",
-                            value=len(data1),
+                            value=len(loaded_channels[0][1]),
                             status_history=[
                                 Bool2Status(
                                     metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
@@ -319,7 +303,7 @@ def main():
                         ),
                         QCMetric(
                             name="Session length >15min",
-                            value=len(data1) / 20 / 60,
+                            value=len(loaded_channels[0][1]) / 20 / 60,
                             status_history=[
                                 Bool2Status(
                                     metrics["IsDataLongerThan15min"],
@@ -363,28 +347,13 @@ def main():
                     "Pass when no NaN values in the data",
                     [
                         QCMetric(
-                            name="No NaN in Green channel",
-                            value=float(np.sum(np.isnan(data1))),
+                            name=f"No NaN in {name} channel",
+                            value=float(np.sum(np.isnan(data))),
                             status_history=[
-                                Bool2Status(
-                                    metrics["NoGreenNan"], t=datetime.now(seattle_tz)
-                                )
+                                Bool2Status(metrics["NoNan"][name], t=datetime.now(seattle_tz))
                             ],
-                        ),
-                        QCMetric(
-                            name="No NaN in Iso channel",
-                            value=float(np.sum(np.isnan(data2))),
-                            status_history=[
-                                Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
-                            ],
-                        ),
-                        QCMetric(
-                            name="No NaN in Red channel",
-                            value=float(np.sum(np.isnan(data3))),
-                            status_history=[
-                                Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
-                            ],
-                        ),
+                        )
+                        for name, data in loaded_channels
                     ],
                     allow_failed=False,
                 ),
@@ -393,36 +362,17 @@ def main():
                     "Pass when CMOS dark floor is <265 in all channel",
                     [
                         QCMetric(
-                            name="Floor average signal in Green channel",
-                            value=float(green_floor_ave),
+                            name=f"Floor average signal in {name} channel",
+                            value=metrics["FloorAves"][name],
                             status_history=[
                                 Bool2Status(
-                                    metrics["CMOSFloorDark_Green"],
+                                    metrics["CMOSFloorDark"][name],
                                     t=datetime.now(seattle_tz),
                                 )
                             ],
                             reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
-                        QCMetric(
-                            name="Floor average signal in Iso channel",
-                            value=float(iso_floor_ave),
-                            status_history=[
-                                Bool2Status(
-                                    metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
-                                )
-                            ],
-                            reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
-                        QCMetric(
-                            name="Floor average signal in Red channel",
-                            value=float(red_floor_ave),
-                            status_history=[
-                                Bool2Status(
-                                    metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
-                                )
-                            ],
-                            reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
+                        )
+                        for name, _ in loaded_channels
                     ],
                 ),
                 create_evaluation(
@@ -432,13 +382,10 @@ def main():
                         QCMetric(
                             name="Max 1st derivative",
                             value=float(
-                                np.max(
-                                    [
-                                        np.max(np.diff(data1[10:-2, 1])),
-                                        np.max(np.diff(data2[10:-2, 1])),
-                                        np.max(np.diff(data3[10:-2, 1])),
-                                    ]
-                                )
+                                np.max([
+                                    np.max(np.diff(data[10:-2, 1]))
+                                    for _, data in loaded_channels
+                                ])
                             ),
                             status_history=[
                                 Bool2Status(
