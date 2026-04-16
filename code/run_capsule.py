@@ -250,6 +250,8 @@ def main():
         data2 = max(data2_list, key=lambda x: x.shape[0])
         data3 = max(data3_list, key=lambda x: x.shape[0])
 
+        seattle_tz = pytz.timezone("America/Los_Angeles")
+
         if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
 
             # Load behavior JSON (dynamic foraging specific)
@@ -297,7 +299,6 @@ def main():
             plot_sync_pulse_diff(rising_time, results_folder)
 
             # Create evaluations with our timezone
-            seattle_tz = pytz.timezone("America/Los_Angeles")
             evaluations = [
                 create_evaluation(
                     "Data length check",
@@ -486,14 +487,11 @@ def main():
                     shutil.move(source_path, destination_path)
         
         else:
-            logging.error("FIP data files are there but at least one ch is empty")
-            logging.info("No Fiber Data to QC")
-            qc_file_path = results_folder / "no_fip_to_qc.txt"
-            # Create an empty file
-            with open(qc_file_path, "w") as file:
-                file.write("FIP data files are missing. This may be a behavior session.")
-
-            print(f"Empty file created at: {qc_file_path}")
+            evaluations = [
+                check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz)
+            ]
+            qc = QualityControl(evaluations=evaluations)
+            qc.write_standard_file(output_directory=str(results_folder))
             
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
