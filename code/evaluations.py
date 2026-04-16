@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import List, Optional
 
 from aind_data_schema.core.quality_control import (
     QCEvaluation,
@@ -14,7 +15,7 @@ from aind_data_schema_models.modalities import Modality
 from data_io import load_csv_data
 
 
-def Bool2Status(boolean_value: bool, t: datetime | None = None) -> QCStatus:
+def Bool2Status(boolean_value: bool, t: Optional[datetime] = None) -> QCStatus:
     """Convert a boolean pass/fail result to a QCStatus object.
 
     Parameters
@@ -42,7 +43,7 @@ def Bool2Status(boolean_value: bool, t: datetime | None = None) -> QCStatus:
 def create_evaluation(
     name: str,
     description: str,
-    metrics: list[QCMetric],
+    metrics: List[QCMetric],
     modality: Modality = Modality.FIB,
     stage: Stage = Stage.RAW,
     allow_failed: bool = False,
@@ -81,7 +82,7 @@ def create_evaluation(
 
 
 def check_empty_channel_csvs(
-    channel_file_paths: list[list[Path]], local_tz: timezone
+    channel_file_paths: List[List[Path]], local_tz: timezone
 ) -> QCEvaluation:
     """Return a QCEvaluation flagging channel CSVs that exist but contain no data.
 

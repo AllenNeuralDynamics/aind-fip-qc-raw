@@ -2,11 +2,12 @@ import csv
 import json
 import logging
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 
 
-def load_json_file(file_path: Path | str) -> dict:
+def load_json_file(file_path: Union[Path, str]) -> dict:
     """Load JSON data from a file.
 
     Parameters
@@ -26,7 +27,7 @@ def load_json_file(file_path: Path | str) -> dict:
         logging.error(f"Error: {file_path} not found.")
 
 
-def load_csv_data(file_path: Path | str) -> np.ndarray:
+def load_csv_data(file_path: Union[Path, str]) -> np.ndarray:
     """Load FIP channel CSV data into a NumPy array.
 
     Handles both legacy files (with a header row) and headerless files.
