@@ -1,8 +1,6 @@
 import os
 import shutil
 import logging
-import csv
-import json
 import glob
 import numpy as np
 from pathlib import Path
@@ -11,81 +9,12 @@ import pytz
 import matplotlib.pyplot as plt
 from aind_log_utils.log import setup_logging
 from aind_data_schema.core.quality_control import (
-    QCEvaluation,
     QCMetric,
-    QCStatus,
-    Stage,
-    Status,
     QualityControl,
 )
-from aind_data_schema_models.modalities import Modality
 
-
-def Bool2Status(boolean_value, t=None):
-    """Convert a boolean value to a QCStatus object."""
-    if boolean_value:
-        return QCStatus(
-            evaluator="Automated", status=Status.PASS, timestamp=t.isoformat()
-        )
-    else:
-        return QCStatus(
-            evaluator="Automated", status=Status.FAIL, timestamp=t.isoformat()
-        )
-
-
-def load_json_file(file_path):
-    """Load JSON data from a file."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logging.error(f"Error: {file_path} not found.")
-
-
-def load_csv_data(file_path):
-    """Load CSV data into a NumPy array."""
-    
-    expected_header = ["SoftwareTS", "ROI0", "ROI1", "ROI2", "ROI3", "ROI4_sensorfloor", "HarpTS"]
-    
-    try:
-        # Check for legacy header
-        with open(file_path, newline='') as f:
-            first_line = f.readline().strip().split(",")
-        skip_first_row = first_line == expected_header
-
-        rows = []
-        with open(file_path, newline='') as f:
-            reader = csv.reader(f)
-            if skip_first_row:
-                next(reader)  # skip header row
-            for row in reader:
-                # Drop 'HarpTS' if present as last column
-                if skip_first_row:
-                    row = row[:-1]
-                for i, cell in enumerate(row):
-                    if cell == "" and i > 0:
-                        row[i] = row[i-1]
-                        logging.error(f"Error: {file_path} csv file is found but broken -- contains empty string.")
-                rows.append(row)
-
-        # Convert to NumPy array
-        return np.array(rows, dtype=np.float32)
-
-    except FileNotFoundError:
-        logging.error(f"Error: {file_path} not found.")
-
-    except ValueError:
-        with open(file_path) as f:
-            reader = csv.reader(f)
-            rows = [row for row in reader]
-    
-        max_cols = max(len(row) for row in rows)
-        if len(rows[-1]) < max_cols:    #eliminating the broken last row
-            rows.pop()
-        return np.array(rows, dtype=np.float32)
-
-        logging.error(f"Error: {file_path} csv file is found but broken.")
-        logging.info("The last row of the data with imperfect column numbers were eliminated")
+from data_io import load_json_file, load_csv_data
+from evaluations import Bool2Status, create_evaluation, check_empty_channel_csvs
 
 def generate_metrics(
     data_lists,
@@ -123,25 +52,6 @@ def generate_metrics(
         "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
     }
     return metrics
-
-
-def create_evaluation(
-    name,
-    description,
-    metrics,
-    modality=Modality.FIB,
-    stage=Stage.RAW,
-    allow_failed=False,
-):
-    """Create a QC evaluation object."""
-    return QCEvaluation(
-        name=name,
-        modality=modality,
-        stage=stage,
-        metrics=metrics,
-        allow_failed_metrics=allow_failed,
-        description=description,
-    )
 
 
 def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter):
@@ -546,6 +456,7 @@ def main():
                         ),
                     ],
                 ),
+                check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz),
             ]
 
             # Create QC object and save
