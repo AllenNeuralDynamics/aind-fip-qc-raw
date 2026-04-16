@@ -1,20 +1,150 @@
 import os
 import shutil
 import logging
+import csv
+import json
 import glob
 import numpy as np
 from pathlib import Path
 from datetime import datetime
 import pytz
 import matplotlib.pyplot as plt
+from aind_logging import setup_logging
 from aind_data_schema.core.quality_control import (
+    QCEvaluation,
     QCMetric,
+    QCStatus,
+    Stage,
+    Status,
     QualityControl,
 )
-from aind_logging import setup_logging
+from aind_data_schema_models.modalities import Modality
 
-from data_io import load_json_file, load_csv_data
-from evaluations import Bool2Status, create_evaluation, check_empty_channel_csvs
+
+def Bool2Status(boolean_value, t=None):
+    """Convert a boolean value to a QCStatus object."""
+    if boolean_value:
+        return QCStatus(
+            evaluator="Automated", status=Status.PASS, timestamp=t.isoformat()
+        )
+    else:
+        return QCStatus(
+            evaluator="Automated", status=Status.FAIL, timestamp=t.isoformat()
+        )
+
+
+def load_json_file(file_path):
+    """Load JSON data from a file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logging.error(f"Error: {file_path} not found.")
+
+
+def load_csv_data(file_path):
+    """Load CSV data into a NumPy array."""
+
+    expected_header = ["SoftwareTS", "ROI0", "ROI1", "ROI2", "ROI3", "ROI4_sensorfloor", "HarpTS"]
+
+    try:
+        # Check for legacy header
+        with open(file_path, newline='') as f:
+            first_line = f.readline().strip().split(",")
+        skip_first_row = first_line == expected_header
+
+        rows = []
+        with open(file_path, newline='') as f:
+            reader = csv.reader(f)
+            if skip_first_row:
+                next(reader)  # skip header row
+            for row in reader:
+                # Drop 'HarpTS' if present as last column
+                if skip_first_row:
+                    row = row[:-1]
+                for i, cell in enumerate(row):
+                    if cell == "" and i > 0:
+                        row[i] = row[i-1]
+                        logging.error(f"Error: {file_path} csv file is found but broken -- contains empty string.")
+                rows.append(row)
+
+        # Convert to NumPy array
+        return np.array(rows, dtype=np.float32)
+
+    except FileNotFoundError:
+        logging.error(f"Error: {file_path} not found.")
+
+    except ValueError:
+        with open(file_path) as f:
+            reader = csv.reader(f)
+            rows = [row for row in reader]
+
+        max_cols = max(len(row) for row in rows)
+        if len(rows[-1]) < max_cols:    #eliminating the broken last row
+            rows.pop()
+        return np.array(rows, dtype=np.float32)
+
+
+def create_evaluation(
+    name,
+    description,
+    metrics,
+    modality=Modality.FIB,
+    stage=Stage.RAW,
+    allow_failed=False,
+):
+    """Create a QC evaluation object."""
+    return QCEvaluation(
+        name=name,
+        modality=modality,
+        stage=stage,
+        metrics=metrics,
+        allow_failed_metrics=allow_failed,
+        description=description,
+    )
+
+
+def check_empty_channel_csvs(channel_file_paths, local_tz):
+    """
+    Return a QCEvaluation flagging channel CSVs that exist but contain no data.
+
+    An empty CSV (a file that exists but has zero data rows, possibly with only
+    a header) indicates a likely hardware failure — e.g. a flaky RedCMOS trigger
+    cable that causes the acquisition system to create the file but write nothing
+    to it. This is distinct from a channel CSV that does not exist at all, which
+    simply means that channel was not recorded (not enabled for this session, or
+    not present on this rig) and is not an error condition.
+    """
+    empty_channel_files = [
+        str(f)
+        for channel_files in channel_file_paths
+        for f in channel_files
+        if len(load_csv_data(f)) == 0
+    ]
+    if empty_channel_files:
+        logging.warning(
+            "Empty channel CSV file(s) detected — likely a hardware failure "
+            f"(e.g. faulty RedCMOS trigger cable): {empty_channel_files}"
+        )
+    evaluation = create_evaluation(
+        "No empty channel CSV files",
+        "Fail if any FIP channel CSV file exists but contains no data, "
+        "indicating a hardware failure (e.g. faulty RedCMOS trigger cable).",
+        [
+            QCMetric(
+                name="Channel CSV files are not empty",
+                value=len(empty_channel_files),
+                status_history=[
+                    Bool2Status(
+                        len(empty_channel_files) == 0,
+                        t=datetime.now(local_tz),
+                    )
+                ],
+            )
+        ],
+    )
+    return evaluation
+
 
 def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
     """Generate QC metrics based on data."""
@@ -29,7 +159,7 @@ def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
         "IsSyncPulseSame": len(rising_time) == len(falling_time),
         "IsSyncPulseSameAsData": len(rising_time) in channel_lengths,
         "NoNan": {name: not np.isnan(data).any() for name, data in loaded_channels},
-        "CMOSFloorDark": {name: floor_aves[name] < CMOSFloorDark_Limit for name, data in loaded_channels},
+        "CMOSFloorDark": {name: floor_aves[name] < CMOSFloorDark_Limit for name, _ in loaded_channels},
         "FloorAves": floor_aves,
         "NoSuddenChangeInSignal": all(
             np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
@@ -207,7 +337,7 @@ def main():
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
 
-    
+
 
     session_data = load_json_file(fiber_base_path / "session.json")
     rig_id = session_data.get("rig_id")
@@ -430,11 +560,11 @@ def main():
                 # Move everything except the excluded file
                 if os.path.isfile(source_path) and filename != excluded_file:
                     shutil.move(source_path, destination_path)
-        
+
         # Create QC object and save
         qc = QualityControl(evaluations=evaluations)
         qc.write_standard_file(output_directory=str(results_folder))
-            
+
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
