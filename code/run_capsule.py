@@ -251,6 +251,9 @@ def main():
         data3 = max(data3_list, key=lambda x: x.shape[0])
 
         seattle_tz = pytz.timezone("America/Los_Angeles")
+        evaluations = [
+            check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz)
+        ]
 
         if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
 
@@ -299,7 +302,7 @@ def main():
             plot_sync_pulse_diff(rising_time, results_folder)
 
             # Create evaluations with our timezone
-            evaluations = [
+            evaluations += [
                 create_evaluation(
                     "Data length check",
                     "Pass when data_length for Green/Iso/Red are same and the session is >15min",
@@ -464,12 +467,7 @@ def main():
                         ),
                     ],
                 ),
-                check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz),
             ]
-
-            # Create QC object and save
-            qc = QualityControl(evaluations=evaluations)
-            qc.write_standard_file(output_directory=str(results_folder))
 
             # We'd like to have our files organized such that QC is in the
             # results directory while plots are in a named folder.
@@ -486,12 +484,9 @@ def main():
                 if os.path.isfile(source_path) and filename != excluded_file:
                     shutil.move(source_path, destination_path)
         
-        else:
-            evaluations = [
-                check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz)
-            ]
-            qc = QualityControl(evaluations=evaluations)
-            qc.write_standard_file(output_directory=str(results_folder))
+        # Create QC object and save
+        qc = QualityControl(evaluations=evaluations)
+        qc.write_standard_file(output_directory=str(results_folder))
             
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
