@@ -104,44 +104,44 @@ def create_evaluation(
     )
 
 
-def check_empty_channel_csvs(channel_file_paths, local_tz):
+def check_empty_channel_csvs(channel_names, channel_file_paths, local_tz):
     """
-    Return a QCEvaluation flagging channel CSVs that exist but contain no data.
+    Return a QCEvaluation with one metric per channel that has CSV file(s).
 
-    An empty CSV (a file that exists but has zero data rows, possibly with only
-    a header) indicates a likely hardware failure — e.g. a flaky RedCMOS trigger
-    cable that causes the acquisition system to create the file but write nothing
-    to it. This is distinct from a channel CSV that does not exist at all, which
-    simply means that channel was not recorded (not enabled for this session, or
-    not present on this rig) and is not an error condition.
+    Each metric checks whether the channel's CSV contains data. A PASS means
+    the channel has valid data rows. A FAIL means the file exists but is empty
+    (zero data rows, possibly header-only), which indicates a likely hardware
+    failure — e.g. a flaky RedCMOS trigger cable.
+
+    Channels with no CSV file at all are not included — a missing file simply
+    means that channel was not recorded (not enabled for this session, or not
+    present on this rig) and is not an error condition.
     """
-    empty_channel_files = [
-        str(f)
-        for channel_files in channel_file_paths
-        for f in channel_files
-        if len(load_csv_data(f)) == 0
-    ]
-    if empty_channel_files:
-        logging.warning(
-            "Empty channel CSV file(s) detected — likely a hardware failure "
-            f"(e.g. faulty RedCMOS trigger cable): {empty_channel_files}"
-        )
-    evaluation = create_evaluation(
-        "No empty channel CSV files",
-        "Fail if any FIP channel CSV file exists but contains no data, "
-        "indicating a hardware failure (e.g. faulty RedCMOS trigger cable).",
-        [
+    channel_metrics = []
+    for name, files in zip(channel_names, channel_file_paths):
+        if not files:
+            continue
+        has_data = all(len(load_csv_data(f)) > 0 for f in files)
+        if not has_data:
+            logging.warning(
+                f"Empty {name} channel CSV detected — likely a hardware failure "
+                f"(e.g. faulty RedCMOS trigger cable): {[str(f) for f in files]}"
+            )
+        channel_metrics.append(
             QCMetric(
-                name="Channel CSV files are not empty",
-                value=len(empty_channel_files),
+                name=f"{name} channel CSV contains data",
+                value=int(has_data),
                 status_history=[
-                    Bool2Status(
-                        len(empty_channel_files) == 0,
-                        t=datetime.now(local_tz),
-                    )
+                    Bool2Status(has_data, t=datetime.now(local_tz))
                 ],
             )
-        ],
+        )
+    evaluation = create_evaluation(
+        "Channel data present",
+        "Per-channel check that each CSV file contains data. "
+        "A FAIL indicates a hardware failure (e.g. faulty RedCMOS trigger cable). "
+        "Channels with no CSV file are excluded (not an error).",
+        channel_metrics,
     )
     return evaluation
 
@@ -376,7 +376,7 @@ def main():
 
         seattle_tz = pytz.timezone("America/Los_Angeles")
         evaluations = [
-            check_empty_channel_csvs(channel_file_paths=channel_file_paths, local_tz=seattle_tz)
+            check_empty_channel_csvs(channel_names=channel_names, channel_file_paths=channel_file_paths, local_tz=seattle_tz)
         ]
 
         if n_channels >= 2:
