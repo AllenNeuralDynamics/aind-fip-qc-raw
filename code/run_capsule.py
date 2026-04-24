@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 import matplotlib.pyplot as plt
+from aind_logging import setup_logging
 from aind_data_schema.core.quality_control import (
     QCEvaluation,
     QCMetric,
@@ -18,7 +19,6 @@ from aind_data_schema.core.quality_control import (
     QualityControl,
 )
 from aind_data_schema_models.modalities import Modality
-from aind_logging import setup_logging
 
 
 def Bool2Status(boolean_value, t=None):
@@ -44,9 +44,9 @@ def load_json_file(file_path):
 
 def load_csv_data(file_path):
     """Load CSV data into a NumPy array."""
-    
+
     expected_header = ["SoftwareTS", "ROI0", "ROI1", "ROI2", "ROI3", "ROI4_sensorfloor", "HarpTS"]
-    
+
     try:
         # Check for legacy header
         with open(file_path, newline='') as f:
@@ -78,51 +78,11 @@ def load_csv_data(file_path):
         with open(file_path) as f:
             reader = csv.reader(f)
             rows = [row for row in reader]
-    
+
         max_cols = max(len(row) for row in rows)
         if len(rows[-1]) < max_cols:    #eliminating the broken last row
             rows.pop()
         return np.array(rows, dtype=np.float32)
-
-        logging.error(f"Error: {file_path} csv file is found but broken.")
-        logging.info("The last row of the data with imperfect column numbers were eliminated")
-
-def generate_metrics(
-    data_lists,
-    data1,
-    data2,
-    data3,
-    rising_time,
-    falling_time,
-    green_floor_ave,
-    iso_floor_ave,
-    red_floor_ave,
-):
-    """Generate QC metrics based on data."""
-    """Limits are set to 265 for all CMOSFloorDark metrics."""
-    CMOSFloorDark_Green_Limit = 265
-    CMOSFloorDark_Iso_Limit = 265
-    CMOSFloorDark_Red_Limit = 265
-    sudden_change_limit = 2000
-    metrics = {
-        "IsDataSizeSame": len(data1) == len(data2) == len(data3),
-        "IsDataLongerThan15min": len(data1) > 18000,
-        "IsSyncPulseSame": len(rising_time) == len(falling_time),
-        "IsSyncPulseSameAsData": len(rising_time)
-        in [len(data1), len(data2), len(data3)],
-        "NoGreenNan": not np.isnan(data1).any(),
-        "NoIsoNan": not np.isnan(data2).any(),
-        "NoRedNan": not np.isnan(data3).any(),
-        "CMOSFloorDark_Green": green_floor_ave < CMOSFloorDark_Green_Limit,
-        "CMOSFloorDark_Iso": iso_floor_ave < CMOSFloorDark_Iso_Limit,
-        "CMOSFloorDark_Red": red_floor_ave < CMOSFloorDark_Red_Limit,
-        "NoSuddenChangeInSignal": all(
-            np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
-            for data in [data1, data2, data3]
-        ),
-        "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
-    }
-    return metrics
 
 
 def create_evaluation(
@@ -142,6 +102,72 @@ def create_evaluation(
         allow_failed_metrics=allow_failed,
         description=description,
     )
+
+
+def check_empty_channel_csvs(channel_names, channel_file_paths, local_tz):
+    """
+    Return a QCEvaluation with one metric per channel that has CSV file(s).
+
+    Each metric checks whether the channel's CSV contains data. A PASS means
+    the channel has valid data rows. A FAIL means the file exists but is empty
+    (zero data rows, possibly header-only), which indicates a likely hardware
+    failure — e.g. a flaky RedCMOS trigger cable.
+
+    Channels with no CSV file at all are not included — a missing file simply
+    means that channel was not recorded (not enabled for this session, or not
+    present on this rig) and is not an error condition.
+    """
+    channel_metrics = []
+    for name, files in zip(channel_names, channel_file_paths):
+        if not files:
+            continue
+        has_data = all(len(load_csv_data(f)) > 0 for f in files)
+        if not has_data:
+            logging.warning(
+                f"Empty {name} channel CSV detected — likely a hardware failure "
+                f"(e.g. faulty RedCMOS trigger cable): {[str(f) for f in files]}"
+            )
+        channel_metrics.append(
+            QCMetric(
+                name=f"{name} channel CSV contains data",
+                value=int(has_data),
+                status_history=[
+                    Bool2Status(has_data, t=datetime.now(local_tz))
+                ],
+            )
+        )
+    evaluation = create_evaluation(
+        "Channel data present",
+        "Per-channel check that each CSV file contains data. "
+        "A FAIL indicates a hardware failure (e.g. faulty RedCMOS trigger cable). "
+        "Channels with no CSV file are excluded (not an error).",
+        channel_metrics,
+    )
+    return evaluation
+
+
+def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
+    """Generate QC metrics based on data."""
+    """Limits are set to 265 for all CMOSFloorDark metrics."""
+    CMOSFloorDark_Limit = 265
+    sudden_change_limit = 2000
+    channel_lengths = [len(data) for _, data in loaded_channels]
+    floor_aves = {name: float(np.mean(data[:, -1])) for name, data in loaded_channels}
+    metrics = {
+        "IsDataSizeSame": len(set(channel_lengths)) == 1,
+        "IsDataLongerThan15min": channel_lengths[0] > 18000,
+        "IsSyncPulseSame": len(rising_time) == len(falling_time),
+        "IsSyncPulseSameAsData": len(rising_time) in channel_lengths,
+        "NoNan": {name: not np.isnan(data).any() for name, data in loaded_channels},
+        "CMOSFloorDark": {name: floor_aves[name] < CMOSFloorDark_Limit for name, _ in loaded_channels},
+        "FloorAves": floor_aves,
+        "NoSuddenChangeInSignal": all(
+            np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
+            for _, data in loaded_channels
+        ),
+        "IsSingleRecordingPerSession": len(data_lists[0]) == 1,
+    }
+    return metrics
 
 
 def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter):
@@ -285,7 +311,7 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 
 def main():
     # Paths and setup
-    fiber_base_path = Path("/data/fiber_raw_data")
+    fiber_base_path = Path(os.getenv("FIBER_DATA_PATH", "/data/fiber_raw_data"))
     process_name = os.getenv("PROCESS_NAME")
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
     asset_name = data_disc_json.get("name")
@@ -311,7 +337,7 @@ def main():
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
 
-    
+
 
     session_data = load_json_file(fiber_base_path / "session.json")
     rig_id = session_data.get("rig_id")
@@ -340,7 +366,20 @@ def main():
         data2 = max(data2_list, key=lambda x: x.shape[0])
         data3 = max(data3_list, key=lambda x: x.shape[0])
 
-        if len(data1) > 0 and len(data2) > 0 and len(data3) > 0:
+        channel_names = ["Green", "Iso", "Red"]
+        loaded_channels = [
+            (name, data)
+            for name, data in zip(channel_names, [data1, data2, data3])
+            if len(data) > 0
+        ]
+        n_channels = len(loaded_channels)
+
+        seattle_tz = pytz.timezone("America/Los_Angeles")
+        evaluations = [
+            check_empty_channel_csvs(channel_names=channel_names, channel_file_paths=channel_file_paths, local_tz=seattle_tz)
+        ]
+
+        if n_channels >= 2:
 
             # Load behavior JSON (dynamic foraging specific)
             # Regex pattern is <subject_id>_YYYY-MM-DD_HH-MM-SS.json
@@ -353,49 +392,38 @@ def main():
             else:
                 logging.info("NO BEHAVIOR JSON — Non-dynamicforaging or simply missing")
                 # preparing fake syncpulses
-                rising_time = list(range(0, len(data1), 50))
-                falling_time = list(range(0, len(data1), 50))
-
-
-            # Calculate floor averages
-            green_floor_ave = np.mean(data1[:, -1])
-            iso_floor_ave = np.mean(data2[:, -1])
-            red_floor_ave = np.mean(data3[:, -1])
+                rising_time = list(range(0, len(loaded_channels[0][1]), 50))
+                falling_time = list(range(0, len(loaded_channels[0][1]), 50))
 
             # Generate metrics
             metrics = generate_metrics(
                 data_lists,
-                data1,
-                data2,
-                data3,
+                loaded_channels,
                 rising_time,
                 falling_time,
-                green_floor_ave,
-                iso_floor_ave,
-                red_floor_ave,
             )
 
-            # Plot data
-            plot_cmos_trace_data(
-                data_list=[data1, data2, data3],
-                colors=["darkgreen", "purple", "magenta"],
-                results_folder=results_folder,
-                rig_id=rig_id,
-                experimenter=experimenter,
-            )
-            plot_sensor_floor(data1, data2, data3, results_folder)
+            # Plot data (only when all 3 channels present — plot functions assume 3 channels)
+            if n_channels == 3:
+                plot_cmos_trace_data(
+                    data_list=[data1, data2, data3],
+                    colors=["darkgreen", "purple", "magenta"],
+                    results_folder=results_folder,
+                    rig_id=rig_id,
+                    experimenter=experimenter,
+                )
+                plot_sensor_floor(data1, data2, data3, results_folder)
             plot_sync_pulse_diff(rising_time, results_folder)
 
             # Create evaluations with our timezone
-            seattle_tz = pytz.timezone("America/Los_Angeles")
-            evaluations = [
+            evaluations += [
                 create_evaluation(
                     "Data length check",
                     "Pass when data_length for Green/Iso/Red are same and the session is >15min",
                     [
                         QCMetric(
                             name="Data length same",
-                            value=len(data1),
+                            value=len(loaded_channels[0][1]),
                             status_history=[
                                 Bool2Status(
                                     metrics["IsDataSizeSame"], t=datetime.now(seattle_tz)
@@ -405,7 +433,7 @@ def main():
                         ),
                         QCMetric(
                             name="Session length >15min",
-                            value=len(data1) / 20 / 60,
+                            value=len(loaded_channels[0][1]) / 20 / 60,
                             status_history=[
                                 Bool2Status(
                                     metrics["IsDataLongerThan15min"],
@@ -449,28 +477,13 @@ def main():
                     "Pass when no NaN values in the data",
                     [
                         QCMetric(
-                            name="No NaN in Green channel",
-                            value=float(np.sum(np.isnan(data1))),
+                            name=f"No NaN in {name} channel",
+                            value=float(np.sum(np.isnan(data))),
                             status_history=[
-                                Bool2Status(
-                                    metrics["NoGreenNan"], t=datetime.now(seattle_tz)
-                                )
+                                Bool2Status(metrics["NoNan"][name], t=datetime.now(seattle_tz))
                             ],
-                        ),
-                        QCMetric(
-                            name="No NaN in Iso channel",
-                            value=float(np.sum(np.isnan(data2))),
-                            status_history=[
-                                Bool2Status(metrics["NoIsoNan"], t=datetime.now(seattle_tz))
-                            ],
-                        ),
-                        QCMetric(
-                            name="No NaN in Red channel",
-                            value=float(np.sum(np.isnan(data3))),
-                            status_history=[
-                                Bool2Status(metrics["NoRedNan"], t=datetime.now(seattle_tz))
-                            ],
-                        ),
+                        )
+                        for name, data in loaded_channels
                     ],
                     allow_failed=False,
                 ),
@@ -479,36 +492,17 @@ def main():
                     "Pass when CMOS dark floor is <265 in all channel",
                     [
                         QCMetric(
-                            name="Floor average signal in Green channel",
-                            value=float(green_floor_ave),
+                            name=f"Floor average signal in {name} channel",
+                            value=metrics["FloorAves"][name],
                             status_history=[
                                 Bool2Status(
-                                    metrics["CMOSFloorDark_Green"],
+                                    metrics["CMOSFloorDark"][name],
                                     t=datetime.now(seattle_tz),
                                 )
                             ],
                             reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
-                        QCMetric(
-                            name="Floor average signal in Iso channel",
-                            value=float(iso_floor_ave),
-                            status_history=[
-                                Bool2Status(
-                                    metrics["CMOSFloorDark_Iso"], t=datetime.now(seattle_tz)
-                                )
-                            ],
-                            reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
-                        QCMetric(
-                            name="Floor average signal in Red channel",
-                            value=float(red_floor_ave),
-                            status_history=[
-                                Bool2Status(
-                                    metrics["CMOSFloorDark_Red"], t=datetime.now(seattle_tz)
-                                )
-                            ],
-                            reference=str(ref_folder / "CMOS_Floor.png"),
-                        ),
+                        )
+                        for name, _ in loaded_channels
                     ],
                 ),
                 create_evaluation(
@@ -518,13 +512,10 @@ def main():
                         QCMetric(
                             name="Max 1st derivative",
                             value=float(
-                                np.max(
-                                    [
-                                        np.max(np.diff(data1[10:-2, 1])),
-                                        np.max(np.diff(data2[10:-2, 1])),
-                                        np.max(np.diff(data3[10:-2, 1])),
-                                    ]
-                                )
+                                np.max([
+                                    np.max(np.diff(data[10:-2, 1]))
+                                    for _, data in loaded_channels
+                                ])
                             ),
                             status_history=[
                                 Bool2Status(
@@ -555,10 +546,6 @@ def main():
                 ),
             ]
 
-            # Create QC object and save
-            qc = QualityControl(evaluations=evaluations)
-            qc.write_standard_file(output_directory=str(results_folder))
-
             # We'd like to have our files organized such that QC is in the
             # results directory while plots are in a named folder.
             # This allows the final results asset to have the same structure
@@ -573,17 +560,11 @@ def main():
                 # Move everything except the excluded file
                 if os.path.isfile(source_path) and filename != excluded_file:
                     shutil.move(source_path, destination_path)
-        
-        else:
-            logging.error("FIP data files are there but at least one ch is empty")
-            logging.info("No Fiber Data to QC")
-            qc_file_path = results_folder / "no_fip_to_qc.txt"
-            # Create an empty file
-            with open(qc_file_path, "w") as file:
-                file.write("FIP data files are missing. This may be a behavior session.")
 
-            print(f"Empty file created at: {qc_file_path}")
-            
+        # Create QC object and save
+        qc = QualityControl(evaluations=evaluations)
+        qc.write_standard_file(output_directory=str(results_folder))
+
     else:
         logging.info("FIP data files are missing. This may be a behavior session.")
         logging.info("No Fiber Data to QC")
