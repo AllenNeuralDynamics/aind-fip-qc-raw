@@ -170,104 +170,55 @@ def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
     return metrics
 
 
-def plot_cmos_trace_data(data_list, colors, results_folder, rig_id, experimenter):
+def plot_cmos_trace_data(loaded_channels, results_folder, rig_id, experimenter):
     """Plot raw frame and cmos data and save to a file."""
-    data1 = data_list[0]
-    data2 = data_list[1]
-    data3 = data_list[2]
-    plt.figure(figsize=(16, 20))
-    for i_panel in range(4):
-        plt.subplot(12, 1, i_panel + 1)
-        plt.plot(data1[:, i_panel + 1], color=colors[0])
-        if i_panel == 0:
-            plt.title(
-                "GreenCh ROI:"
-                + str(i_panel)
-                + " rig: "
-                + rig_id
-                + " by: "
-                + experimenter
-            )
-            plt.ylabel("CMOS pixel val")
-        else:
-            plt.title("GreenCh ROI:" + str(i_panel))
+    color_map = {"Green": "darkgreen", "Iso": "purple", "Red": "magenta"}
+    n_channels = len(loaded_channels)
+    fig, axes = plt.subplots(n_channels * 4, 1, figsize=(16, 20), sharex=True)
+    for ch_idx, (name, data) in enumerate(loaded_channels):
+        for i_panel in range(4):
+            ax = axes[ch_idx * 4 + i_panel]
+            ax.plot(data[:, i_panel + 1], color=color_map[name])
+            if ch_idx == 0 and i_panel == 0:
+                ax.set_title(f"{name}Ch ROI:{i_panel} rig: {rig_id} by: {experimenter}")
+                ax.set_ylabel("CMOS pixel val")
+            else:
+                ax.set_title(f"{name}Ch ROI:{i_panel}")
+    axes[-1].set_xlabel("frames (20Hz)")
 
-    for i_panel in range(4):
-        plt.subplot(12, 1, i_panel + 5)
-        plt.plot(data2[:, i_panel + 1], color=colors[1])
-        plt.title("Iso ROI:" + str(i_panel))
+    fig.tight_layout()
 
-    for i_panel in range(4):
-        plt.subplot(12, 1, i_panel + 9)
-        plt.plot(data3[:, i_panel + 1], color=colors[2])
-        plt.title("RedCh ROI:" + str(i_panel))
-    plt.xlabel("frames (20Hz)")
-
-    plt.subplots_adjust(hspace=1.2)
-
-    plt.savefig(f"{results_folder}/raw_traces.png")
-    plt.savefig(f"{results_folder}/raw_traces.pdf")
+    fig.savefig(f"{results_folder}/raw_traces.png")
+    fig.savefig(f"{results_folder}/raw_traces.pdf")
     plt.show()
 
 
-def plot_sensor_floor(data1, data2, data3, results_folder):
+def plot_sensor_floor(loaded_channels, results_folder):
     """
-    Plot histograms for sensor floor values of three data sets.
+    Plot histograms for sensor floor values for each loaded channel.
 
     Parameters:
-        data1 (numpy.ndarray): Data for GreenCh.
-        data2 (numpy.ndarray): Data for IsoCh.
-        data3 (numpy.ndarray): Data for RedCh.
+        loaded_channels: list of (name, data) tuples for each channel with data.
         results_folder (str): Path to save the output plots.
     """
+    color_map = {"Green": "green", "Iso": "purple", "Red": "red"}
+    n_channels = len(loaded_channels)
     plt.figure(figsize=(8, 4))
-
-    # GreenCh Floor
-    plt.subplot(2, 3, 1)
-    plt.hist(data1[:, -1], bins=100, range=(255, 270), color="green", alpha=0.7)
-    plt.xlim(255, 270)
-    GreenChFloorAve = np.mean(data1[:, -1])
-    plt.title(f"GreenCh FloorAve: {GreenChFloorAve:.2f}")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
-
-    plt.subplot(2, 3, 4)
-    plt.hist(data1[:, -1], bins=100, color="green", alpha=0.7)
-    GreenChFloorAve = np.mean(data1[:, -1])
-    plt.title(f"GreenFloor - All data")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
-
-    # IsoCh Floor
-    plt.subplot(2, 3, 2)
-    plt.hist(data2[:, -1], bins=100, range=(255, 270), color="purple", alpha=0.7)
-    plt.xlim(255, 270)
-    IsoChFloorAve = np.mean(data2[:, -1])
-    plt.title(f"IsoCh FloorAve: {IsoChFloorAve:.2f}")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
-
-    plt.subplot(2, 3, 5)
-    plt.hist(data2[:, -1], bins=100, color="purple", alpha=0.7)
-    IsoChFloorAve = np.mean(data2[:, -1])
-    plt.title(f"IsoFloor - All data")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
-
-    # RedCh Floor
-    plt.subplot(2, 3, 3)
-    plt.hist(data3[:, -1], bins=100, range=(255, 270), color="red", alpha=0.7)
-    RedChFloorAve = np.mean(data3[:, -1])
-    plt.title(f"RedCh FloorAve: {RedChFloorAve:.2f}")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
-
-    plt.subplot(2, 3, 6)
-    plt.hist(data3[:, -1], bins=100, color="red", alpha=0.7)
-    RedChFloorAve = np.mean(data3[:, -1])
-    plt.title(f"RedFloor - All data")
-    plt.xlabel("CMOS pixel val")
-    plt.ylabel("counts")
+    for ch_idx, (name, data) in enumerate(loaded_channels):
+        floor_ave = np.mean(data[:, -1])
+        # Top row: zoomed range
+        plt.subplot(2, n_channels, ch_idx + 1)
+        plt.hist(data[:, -1], bins=100, range=(255, 270), color=color_map[name], alpha=0.7)
+        plt.xlim(255, 270)
+        plt.title(f"{name}Ch FloorAve: {floor_ave:.2f}")
+        plt.xlabel("CMOS pixel val")
+        plt.ylabel("counts")
+        # Bottom row: all data
+        plt.subplot(2, n_channels, n_channels + ch_idx + 1)
+        plt.hist(data[:, -1], bins=100, color=color_map[name], alpha=0.7)
+        plt.title(f"{name}Floor - All data")
+        plt.xlabel("CMOS pixel val")
+        plt.ylabel("counts")
 
     plt.subplots_adjust(wspace=0.8)
     plt.subplots_adjust(hspace=0.8)
@@ -352,8 +303,11 @@ def main():
         for fiber_channel in fiber_channel_patterns
     ]
 
-    # Check if all required files exist
-    fiber_exists = all(channel_file_paths)
+    # Process if at least one channel CSV exists. Two-channel recordings produce
+    # only two CSV files (no Red); this is not an error, just a different rig
+    # configuration. (Distinct from the case where three CSVs exist but one is
+    # empty, which is handled separately by check_empty_channel_csvs.)
+    fiber_exists = any(channel_file_paths)
 
     if fiber_exists:
         data_lists = [[load_csv_data(file) for file in file_list] for file_list in channel_file_paths]
@@ -362,9 +316,9 @@ def main():
         if len(data_lists[0]) > 1:
             logging.error("Multiple recording files found in this session. Only the largest file was used for QC.")
 
-        data1 = max(data1_list, key=lambda x: x.shape[0]) #using only the longest file for each ch
-        data2 = max(data2_list, key=lambda x: x.shape[0])
-        data3 = max(data3_list, key=lambda x: x.shape[0])
+        data1 = max(data1_list, key=lambda x: x.shape[0]) if data1_list else np.array([]) #using only the longest file for each ch
+        data2 = max(data2_list, key=lambda x: x.shape[0]) if data2_list else np.array([])
+        data3 = max(data3_list, key=lambda x: x.shape[0]) if data3_list else np.array([])
 
         channel_names = ["Green", "Iso", "Red"]
         loaded_channels = [
@@ -403,16 +357,14 @@ def main():
                 falling_time,
             )
 
-            # Plot data (only when all 3 channels present — plot functions assume 3 channels)
-            if n_channels == 3:
-                plot_cmos_trace_data(
-                    data_list=[data1, data2, data3],
-                    colors=["darkgreen", "purple", "magenta"],
-                    results_folder=results_folder,
-                    rig_id=rig_id,
-                    experimenter=experimenter,
-                )
-                plot_sensor_floor(data1, data2, data3, results_folder)
+            # Plot data
+            plot_cmos_trace_data(
+                loaded_channels=loaded_channels,
+                results_folder=results_folder,
+                rig_id=rig_id,
+                experimenter=experimenter,
+            )
+            plot_sensor_floor(loaded_channels, results_folder)
             plot_sync_pulse_diff(rising_time, results_folder)
 
             # Create evaluations with our timezone
