@@ -174,22 +174,22 @@ def plot_cmos_trace_data(loaded_channels, results_folder, rig_id, experimenter):
     """Plot raw frame and cmos data and save to a file."""
     color_map = {"Green": "darkgreen", "Iso": "purple", "Red": "magenta"}
     n_channels = len(loaded_channels)
-    plt.figure(figsize=(16, 20))
+    fig, axes = plt.subplots(n_channels * 4, 1, figsize=(16, 20), sharex=True)
     for ch_idx, (name, data) in enumerate(loaded_channels):
         for i_panel in range(4):
-            plt.subplot(n_channels * 4, 1, ch_idx * 4 + i_panel + 1)
-            plt.plot(data[:, i_panel + 1], color=color_map[name])
+            ax = axes[ch_idx * 4 + i_panel]
+            ax.plot(data[:, i_panel + 1], color=color_map[name])
             if ch_idx == 0 and i_panel == 0:
-                plt.title(f"{name}Ch ROI:{i_panel} rig: {rig_id} by: {experimenter}")
-                plt.ylabel("CMOS pixel val")
+                ax.set_title(f"{name}Ch ROI:{i_panel} rig: {rig_id} by: {experimenter}")
+                ax.set_ylabel("CMOS pixel val")
             else:
-                plt.title(f"{name}Ch ROI:{i_panel}")
-    plt.xlabel("frames (20Hz)")
+                ax.set_title(f"{name}Ch ROI:{i_panel}")
+    axes[-1].set_xlabel("frames (20Hz)")
 
-    plt.subplots_adjust(hspace=1.2)
+    fig.tight_layout()
 
-    plt.savefig(f"{results_folder}/raw_traces.png")
-    plt.savefig(f"{results_folder}/raw_traces.pdf")
+    fig.savefig(f"{results_folder}/raw_traces.png")
+    fig.savefig(f"{results_folder}/raw_traces.pdf")
     plt.show()
 
 
