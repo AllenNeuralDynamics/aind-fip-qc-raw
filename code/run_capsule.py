@@ -303,8 +303,11 @@ def main():
         for fiber_channel in fiber_channel_patterns
     ]
 
-    # Check if all required files exist
-    fiber_exists = all(channel_file_paths)
+    # Process if at least one channel CSV exists. Two-channel recordings produce
+    # only two CSV files (no Red); this is not an error, just a different rig
+    # configuration. (Distinct from the case where three CSVs exist but one is
+    # empty, which is handled separately by check_empty_channel_csvs.)
+    fiber_exists = any(channel_file_paths)
 
     if fiber_exists:
         data_lists = [[load_csv_data(file) for file in file_list] for file_list in channel_file_paths]
@@ -313,9 +316,9 @@ def main():
         if len(data_lists[0]) > 1:
             logging.error("Multiple recording files found in this session. Only the largest file was used for QC.")
 
-        data1 = max(data1_list, key=lambda x: x.shape[0]) #using only the longest file for each ch
-        data2 = max(data2_list, key=lambda x: x.shape[0])
-        data3 = max(data3_list, key=lambda x: x.shape[0])
+        data1 = max(data1_list, key=lambda x: x.shape[0]) if data1_list else np.array([]) #using only the longest file for each ch
+        data2 = max(data2_list, key=lambda x: x.shape[0]) if data2_list else np.array([])
+        data3 = max(data3_list, key=lambda x: x.shape[0]) if data3_list else np.array([])
 
         channel_names = ["Green", "Iso", "Red"]
         loaded_channels = [
