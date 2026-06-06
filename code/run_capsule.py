@@ -269,8 +269,9 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 def detect_psd_peaks(
     signal, fs=20, nperseg=1024, threshold_mad=6.0, size=51, ax=None, ch="Green"
 ):
-    freqs, psd = np.array(welch(signal, fs=fs, nperseg=nperseg))[:, 1:-1]
-    log_psd = np.log(psd)
+    freqs, psd = welch(signal, fs=fs, nperseg=nperseg)
+    freqs, psd = freqs[1:-1], psd[1:-1]
+    log_psd = np.log(np.maximum(psd, np.finfo(float).tiny))
     trend = median_filter(log_psd, size=size, mode="nearest")
     residuals = log_psd - trend
     mad = median_abs_deviation(residuals)
@@ -282,7 +283,7 @@ def detect_psd_peaks(
         ax[0].semilogy(freqs, psd, c=c, label=f"PSD of {ch} channel")
         ax[0].semilogy(freqs, np.exp(trend), c="C1", label="trend")
         ax[0].semilogy(freqs[mask], psd[mask], "x", c="C3", ms=8)
-        ax[1].plot(freqs, residuals, c=c, label="log(PSD - trend)")
+        ax[1].plot(freqs, residuals, c=c, label="log(PSD) - trend")
         ax[1].axhline(thresh, c="C3", label="threshold")
         ax[1].plot(freqs[mask], residuals[mask], "x", c="C3", ms=8)
         for f, r in zip(freqs[mask], residuals[mask]):
@@ -326,7 +327,14 @@ def plot_psd(loaded_channels, results_folder):
         a.set_xlabel("Frequency [Hz]")
     fig.savefig(f"{results_folder}/power_spectrum.png", bbox_inches="tight", pad_inches=0.05)
     max_peaks = np.array(
-        [[p[0][np.argmax(p[1])], max(p[1]) / p[2]] for p in peaks if len(p[0])]
+        [
+            [
+                p[0][np.argmax(p[1])],
+                max(p[1]) / max(p[2], np.finfo(float).eps),
+            ]
+            for p in peaks
+            if len(p[0])
+        ]
     )
     return max_peaks[np.argmax(max_peaks[:, 1]), 0] if len(max_peaks) else None
 
