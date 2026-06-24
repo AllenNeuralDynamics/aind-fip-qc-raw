@@ -165,16 +165,13 @@ def check_empty_channel_csvs(channel_names, channel_file_paths, local_tz):
 
 
 def generate_metrics(data_lists, loaded_channels, rising_time, falling_time,
-                     cmos_floor_limits=None):
+                     cmos_floor_limits={"Green": 265.0, "Iso": 265.0, "Red": 265.0}):
     """Generate QC metrics based on data.
 
-    cmos_floor_limits: optional dict mapping channel name -> CMOS dark-floor
-    threshold (pixel value). A channel PASSES when its floor average is below
-    its limit. Channels without an explicit entry fall back to
-    DEFAULT_CMOS_FLOOR_LIMIT. These can be tuned per color (see issue #22).
+    cmos_floor_limits: dict mapping channel name -> CMOS dark-floor threshold
+    (pixel value). A channel PASSES when its floor average is below its limit.
+    These can be tuned per color (see issue #22).
     """
-    DEFAULT_CMOS_FLOOR_LIMIT = 265.0
-    cmos_floor_limits = cmos_floor_limits or {}
     sudden_change_limit = 2000
     channel_lengths = [len(data) for _, data in loaded_channels]
     floor_aves = {name: float(np.mean(data[:, -1])) for name, data in loaded_channels}
@@ -185,7 +182,7 @@ def generate_metrics(data_lists, loaded_channels, rising_time, falling_time,
         "IsSyncPulseSameAsData": len(rising_time) in channel_lengths,
         "NoNan": {name: not np.isnan(data).any() for name, data in loaded_channels},
         "CMOSFloorDark": {
-            name: floor_aves[name] < cmos_floor_limits.get(name, DEFAULT_CMOS_FLOOR_LIMIT)
+            name: floor_aves[name] < cmos_floor_limits[name]
             for name, _ in loaded_channels
         },
         "FloorAves": floor_aves,
