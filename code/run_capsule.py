@@ -170,7 +170,7 @@ def generate_metrics(data_lists, loaded_channels, rising_time, falling_time,
 
     cmos_floor_limits: dict mapping channel name -> CMOS dark-floor threshold
     (pixel value). A channel PASSES when its floor average is below its limit.
-    These can be tuned per color (see issue #22).
+    These can be tuned per color.
     """
     sudden_change_limit = 2000
     channel_lengths = [len(data) for _, data in loaded_channels]
