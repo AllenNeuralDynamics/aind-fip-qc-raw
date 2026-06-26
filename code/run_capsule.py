@@ -1,6 +1,7 @@
 import os
 import shutil
 import logging
+import argparse
 import csv
 import json
 import glob
@@ -19,6 +20,23 @@ from aind_data_schema.core.quality_control import (
     QualityControl,
 )
 from aind_data_schema_models.modalities import Modality
+
+
+def parse_args():
+    """Parse command-line arguments.
+
+    These are exposed as Code Ocean App Panel parameters so the per-channel
+    CMOS dark-floor thresholds can be tuned without editing code.
+    Defaults preserve the historical behavior (265 for every channel).
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--green-floor-limit", type=int, default=265,
+                        help="CMOS dark-floor threshold for the Green channel.")
+    parser.add_argument("--iso-floor-limit", type=int, default=265,
+                        help="CMOS dark-floor threshold for the Iso channel.")
+    parser.add_argument("--red-floor-limit", type=int, default=265,
+                        help="CMOS dark-floor threshold for the Red channel.")
+    return parser.parse_args()
 
 
 def Bool2Status(boolean_value, t=None):
@@ -146,10 +164,14 @@ def check_empty_channel_csvs(channel_names, channel_file_paths, local_tz):
     return evaluation
 
 
-def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
-    """Generate QC metrics based on data."""
-    """Limits are set to 265 for all CMOSFloorDark metrics."""
-    CMOSFloorDark_Limit = 265
+def generate_metrics(data_lists, loaded_channels, rising_time, falling_time,
+                     cmos_floor_limits={"Green": 265, "Iso": 265, "Red": 265}):
+    """Generate QC metrics based on data.
+
+    cmos_floor_limits: dict mapping channel name -> CMOS dark-floor threshold
+    (pixel value). A channel PASSES when its floor average is below its limit.
+    These can be tuned per color.
+    """
     sudden_change_limit = 2000
     channel_lengths = [len(data) for _, data in loaded_channels]
     floor_aves = {name: float(np.mean(data[:, -1])) for name, data in loaded_channels}
@@ -159,7 +181,10 @@ def generate_metrics(data_lists, loaded_channels, rising_time, falling_time):
         "IsSyncPulseSame": len(rising_time) == len(falling_time),
         "IsSyncPulseSameAsData": len(rising_time) in channel_lengths,
         "NoNan": {name: not np.isnan(data).any() for name, data in loaded_channels},
-        "CMOSFloorDark": {name: floor_aves[name] < CMOSFloorDark_Limit for name, _ in loaded_channels},
+        "CMOSFloorDark": {
+            name: floor_aves[name] < cmos_floor_limits[name]
+            for name, _ in loaded_channels
+        },
         "FloorAves": floor_aves,
         "NoSuddenChangeInSignal": all(
             np.max(np.diff(data[10:-2, 1])) < sudden_change_limit
@@ -262,6 +287,12 @@ def plot_sync_pulse_diff(rising_time, results_folder):
 
 def main():
     # Paths and setup
+    args = parse_args()
+    cmos_floor_limits = {
+        "Green": args.green_floor_limit,
+        "Iso": args.iso_floor_limit,
+        "Red": args.red_floor_limit,
+    }
     fiber_base_path = Path(os.getenv("FIBER_DATA_PATH", "/data/fiber_raw_data"))
     process_name = os.getenv("PROCESS_NAME")
     data_disc_json = load_json_file(fiber_base_path / "data_description.json")
@@ -355,6 +386,7 @@ def main():
                 loaded_channels,
                 rising_time,
                 falling_time,
+                cmos_floor_limits=cmos_floor_limits,
             )
 
             # Plot data
