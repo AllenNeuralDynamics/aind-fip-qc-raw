@@ -30,11 +30,11 @@ def parse_args():
     Defaults preserve the historical behavior (265 for every channel).
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--green-floor-limit", type=float, default=265.0,
+    parser.add_argument("--green-floor-limit", type=int, default=265,
                         help="CMOS dark-floor threshold for the Green channel.")
-    parser.add_argument("--iso-floor-limit", type=float, default=265.0,
+    parser.add_argument("--iso-floor-limit", type=int, default=265,
                         help="CMOS dark-floor threshold for the Iso channel.")
-    parser.add_argument("--red-floor-limit", type=float, default=265.0,
+    parser.add_argument("--red-floor-limit", type=int, default=265,
                         help="CMOS dark-floor threshold for the Red channel.")
     return parser.parse_args()
 
@@ -165,7 +165,7 @@ def check_empty_channel_csvs(channel_names, channel_file_paths, local_tz):
 
 
 def generate_metrics(data_lists, loaded_channels, rising_time, falling_time,
-                     cmos_floor_limits={"Green": 265.0, "Iso": 265.0, "Red": 265.0}):
+                     cmos_floor_limits={"Green": 265, "Iso": 265, "Red": 265}):
     """Generate QC metrics based on data.
 
     cmos_floor_limits: dict mapping channel name -> CMOS dark-floor threshold

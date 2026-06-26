@@ -8,7 +8,7 @@
 			"param_name": "green-floor-limit",
 			"type": "text",
 			"value_type": "number",
-			"default_value": "265.0"
+			"default_value": "265"
 		},
 		{
 			"id": "SKFn5IDQYoN1YYgI",
@@ -16,7 +16,7 @@
 			"param_name": "iso-floor-limit",
 			"type": "text",
 			"value_type": "number",
-			"default_value": "265.0"
+			"default_value": "265"
 		},
 		{
 			"id": "iYfGaEINMyKIUwsZ",
@@ -24,7 +24,7 @@
 			"param_name": "red-floor-limit",
 			"type": "text",
 			"value_type": "number",
-			"default_value": "265.0"
+			"default_value": "265"
 		}
 	]
 }
