@@ -26,7 +26,7 @@ def parse_args():
     """Parse command-line arguments.
 
     These are exposed as Code Ocean App Panel parameters so the per-channel
-    CMOS dark-floor thresholds can be tuned without editing code (see issue #22).
+    CMOS dark-floor thresholds can be tuned without editing code.
     Defaults preserve the historical behavior (265 for every channel).
     """
     parser = argparse.ArgumentParser()
