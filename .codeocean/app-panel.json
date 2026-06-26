@@ -1,0 +1,30 @@
+{
+	"version": 1,
+	"named_parameters": true,
+	"parameters": [
+		{
+			"id": "BqzLJdDImHRHHdey",
+			"name": "green-floor-limit",
+			"param_name": "green-floor-limit",
+			"type": "text",
+			"value_type": "number",
+			"default_value": "265.0"
+		},
+		{
+			"id": "SKFn5IDQYoN1YYgI",
+			"name": "iso-floor-limit",
+			"param_name": "iso-floor-limit",
+			"type": "text",
+			"value_type": "number",
+			"default_value": "265.0"
+		},
+		{
+			"id": "iYfGaEINMyKIUwsZ",
+			"name": "red-floor-limit",
+			"param_name": "red-floor-limit",
+			"type": "text",
+			"value_type": "number",
+			"default_value": "265.0"
+		}
+	]
+}
