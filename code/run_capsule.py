@@ -485,7 +485,7 @@ def main():
                     "Pass when data_length for Green/Iso/Red are same and the session is >15min",
                     [
                         QCMetric(
-                            name="Data length same",
+                            name="Data length",
                             value=len(loaded_channels[0][1]),
                             status_history=[
                                 Bool2Status(
