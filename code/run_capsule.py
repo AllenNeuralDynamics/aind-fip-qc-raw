@@ -1,25 +1,29 @@
+import csv
+import glob
+import json
+import logging
 import os
 import shutil
-import logging
-import argparse
-import csv
-import json
-import glob
-import numpy as np
-from pathlib import Path
 from datetime import datetime
-import pytz
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-from aind_logging import setup_logging
+import numpy as np
+import pytz
 from aind_data_schema.core.quality_control import (
     QCEvaluation,
     QCMetric,
     QCStatus,
+    QualityControl,
     Stage,
     Status,
-    QualityControl,
 )
 from aind_data_schema_models.modalities import Modality
+from scipy.ndimage import median_filter
+from scipy.signal import find_peaks, welch
+from scipy.stats import median_abs_deviation
+
+from aind_logging import setup_logging
 
 
 def parse_args():
@@ -306,6 +310,80 @@ def plot_sync_pulse_diff(rising_time, results_folder):
     plt.savefig(f"{results_folder}/SyncPulseDiff.pdf")
     plt.show()
 
+
+def detect_psd_peaks(
+    signal, fs=20, nperseg=1024, threshold_mad=6.0, size=51, ax=None, ch="Green"
+):
+    freqs, psd = welch(signal, fs=fs, nperseg=nperseg)
+    freqs, psd = freqs[1:-1], psd[1:-1]
+    log_psd = np.log(np.maximum(psd, np.finfo(float).tiny))
+    trend = median_filter(log_psd, size=size, mode="nearest")
+    residuals = log_psd - trend
+    mad = median_abs_deviation(residuals)
+    thresh = np.median(residuals) + threshold_mad * mad
+    peaks_idx, _ = find_peaks(residuals, distance=2)
+    mask = (residuals > thresh) & np.isin(np.arange(len(residuals)), peaks_idx)
+    if ax is not None:
+        c = {"Green": "#009E73", "Iso": "#0072B2", "Red": "#D55E00"}.get(ch, "C0")
+        ax[0].semilogy(freqs, psd, c=c, label=f"PSD of {ch} channel")
+        ax[0].semilogy(freqs, np.exp(trend), c="C1", label="trend")
+        ax[0].semilogy(freqs[mask], psd[mask], "x", c="C3", ms=8)
+        ax[1].plot(freqs, residuals, c=c, label="log(PSD) - trend")
+        ax[1].axhline(thresh, c="C3", label="threshold")
+        ax[1].plot(freqs[mask], residuals[mask], "x", c="C3", ms=8)
+        for f, r in zip(freqs[mask], residuals[mask]):
+            ax[1].annotate(
+                f"{f:.2f} Hz",
+                xy=(f, r),
+                xytext=(4, 4),
+                textcoords="offset points",
+                fontsize=7,
+            )
+    return freqs[mask], residuals[mask], thresh
+
+
+def plot_psd(loaded_channels, results_folder):
+    peaks = []
+    fig = plt.figure(figsize=(15, 20))
+    gs_outer = fig.add_gridspec(3, 1, hspace=0.1)  # group by channel
+    ax = np.empty((12, 2), dtype=object)
+    for i in range(3):
+        gs_inner = gs_outer[i].subgridspec(4, 2, hspace=0.1, wspace=0.1)
+        for r in range(4):
+            for c in range(2):
+                sharex = ax[0, c] if (i > 0 or r > 0) else None
+                ax[4 * i + r, c] = fig.add_subplot(gs_inner[r, c], sharex=sharex)
+
+    for i, (ch, data) in enumerate(loaded_channels):
+        for roi in range(4):
+            row = 4 * i + roi
+            try:
+                peaks.append(detect_psd_peaks(data[:, roi + 1], ax=ax[row], ch=ch))
+            except Exception:
+                logging.exception(f"Failed to plot PSD for {ch} ROI {roi}")
+            ax[row, 0].set_ylabel(f"ROI {roi}")
+        ax[4 * i, 0].set_title(f"PSD of {ch} channel", x=1)
+        for a in ax[4 * i]:
+            a.legend()
+    for row in range(11):
+        for a in ax[row]:
+            a.tick_params(labelbottom=False)
+    for a in ax[-1]:
+        a.set_xlabel("Frequency [Hz]")
+    fig.savefig(f"{results_folder}/power_spectrum.png", bbox_inches="tight", pad_inches=0.05)
+    max_peaks = np.array(
+        [
+            [
+                p[0][np.argmax(p[1])],
+                max(p[1]) / max(p[2], np.finfo(float).eps),
+            ]
+            for p in peaks
+            if len(p[0])
+        ]
+    )
+    return max_peaks[np.argmax(max_peaks[:, 1]), 0] if len(max_peaks) else None
+
+
 def main():
     # Paths and setup
     args = parse_args()
@@ -339,7 +417,6 @@ def main():
     subject_id = subject_data.get("subject_id")
     if not subject_id:
         logging.error("Error: Subject ID is missing from subject.json.")
-
 
 
     session_data = load_json_file(fiber_base_path / "session.json")
@@ -421,6 +498,7 @@ def main():
             )
             plot_sensor_floor(loaded_channels, results_folder)
             plot_sync_pulse_diff(rising_time, results_folder)
+            freq_of_peak = plot_psd(loaded_channels, results_folder)
 
             # Create evaluations with our timezone
             evaluations += [
@@ -566,6 +644,23 @@ def main():
                         ),
                     ],
                 ),
+                create_evaluation(
+                    "No spurious PSD peaks",
+                    "Pass when no ROI shows an anomalous narrowband peak. A FAIL indicates periodic interference (e.g. electrical noise).",
+                    [
+                        QCMetric(
+                            name="Dominant spectral peak frequency [Hz]",
+                            value=float(freq_of_peak) if freq_of_peak is not None else float("nan"),
+                            status_history=[
+                                Bool2Status(
+                                    freq_of_peak is None,
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
+                            reference=str(ref_folder / "power_spectrum.png"),
+                        ),
+                    ],
+                ),
             ]
 
             # We'd like to have our files organized such that QC is in the
@@ -602,7 +697,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
+    except Exception:
         logging.exception(
             "Pipeline stage failed",
             extra={"event_type": "stage_error"}

@@ -1,4 +1,4 @@
-# hash:sha256:aae7d23e3b1c8e52172cd8c977a796cf79b8e04384a1207e313c5f90da1d97b0
+# hash:sha256:778d69a4d4f638344b351988e9a60b5b7aadfc29ca748864a9f89b08c3b1a415
 ARG REGISTRY_HOST
 FROM $REGISTRY_HOST/codeocean/jupyterlab:3.0.9-miniconda4.9.2-python3.8-ubuntu20.04
 
@@ -18,6 +18,7 @@ RUN pip install -U --no-cache-dir \
     numpy==1.24.4 \
     pandas==2.0.3 \
     pyyaml==6.0.3 \
+    scipy==1.10.1 \
     watchtower==3.4.0
 
 ADD "https://github.com/coder/code-server/releases/download/v4.95.3/code-server-4.95.3-linux-amd64.tar.gz" /.code-server/code-server.tar.gz
