@@ -103,6 +103,27 @@ def load_csv_data(file_path):
         return np.array(rows, dtype=np.float32)
 
 
+def get_length_of_movies(fiber_raw_path):
+    """Return the maximum number of frames per channel for raw fiber photometry movies.
+
+    Args:
+        fiber_raw_path: Path to the directory containing raw binary channel files.
+
+    Returns:
+        List of ints, one per channel (G, Iso, R), with the max frame count across
+        files matching each channel glob pattern.
+    """
+    channel_bin_paths = [
+        sorted(fiber_raw_path.glob(fiber_channel))
+        for fiber_channel in ["FIP_RawG*", "FIP_RawIso_*", "FIP_RawR_*"]
+    ]
+
+    def _get_num_frames(video_file, frame_size=200 * 200 * 2):
+        return os.path.getsize(video_file) // frame_size
+
+    return [max([_get_num_frames(f) for f in ch_files]) for ch_files in channel_bin_paths]   
+    
+    
 def create_evaluation(
     name,
     description,
@@ -358,6 +379,8 @@ def main():
             if len(data) > 0
         ]
         n_channels = len(loaded_channels)
+        len_csv =[len(data) for _, data in loaded_channels]
+        len_bin = get_length_of_movies(fiber_raw_path)
 
         seattle_tz = pytz.timezone("America/Los_Angeles")
         evaluations = [
@@ -403,7 +426,8 @@ def main():
             evaluations += [
                 create_evaluation(
                     "Data length check",
-                    "Pass when data_length for Green/Iso/Red are same and the session is >15min",
+                    "Pass when 1) data_length for Green/Iso/Red are same; "
+                    "2) the session is >15min; 3) data lengths in *.bin and *.csv agree",
                     [
                         QCMetric(
                             name="Data length",
@@ -425,6 +449,20 @@ def main():
                                 )
                             ],
                             reference=str(ref_folder / "raw_traces.png"),
+                        ),
+                        QCMetric(
+                            name="Data length in *.bin and *.csv",
+                            value={"channel": channel_names, "*.bin": len_bin, "*.csv": len_csv},
+                            status_history=[                                            
+                                Bool2Status(
+                                    (
+                                        False
+                                        if len(len_bin) != len(len_csv)
+                                        else all(b == c for b, c in zip(len_bin, len_csv))
+                                    ),
+                                    t=datetime.now(seattle_tz),
+                                )
+                            ],
                         ),
                     ],
                 ),
